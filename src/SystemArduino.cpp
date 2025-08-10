@@ -141,10 +141,29 @@ void forceTransportReconnect() {
     if (transport && transport != &serialTransport) {
         delete transport; // Clean up old transport
     }
-    transport = &serialTransport; // Temporarily use serial fallback
+    transport = nullptr; // Don't use serial fallback to avoid early return in selectTransport
     
-    // Now call selectTransport which will create new transport with updated config
-    selectTransport();
+    // Force transport selection even without WiFi ready check
+    if (wifiReady()) {
+        // Try to create WiFi transport with updated config
+        Transport* wifiTransport = TransportFactory::createTransport();
+        if (wifiTransport && wifiTransport->begin()) {
+            transport = wifiTransport;
+            dbg_printf("Transport: Forced WiFi transport reconnection successful\n");
+            return;
+        } else {
+            // Failed to create WiFi transport, clean up
+            if (wifiTransport) {
+                delete wifiTransport;
+            }
+            dbg_printf("Transport: Failed to force WiFi transport reconnection\n");
+        }
+    }
+    
+    // Fallback to serial transport if WiFi transport fails
+    transport = &serialTransport;
+    transport->begin();
+    dbg_printf("Transport: Falling back to Serial transport\n");
 }
 #endif
 
