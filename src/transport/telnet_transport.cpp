@@ -44,6 +44,7 @@ void TelnetTransport::loop() {
     }
     
     // Check if client is still connected
+    bool wasConnected = _connected;
     if (_connected && !_client.connected()) {
         _connected = false;
         _client.stop();
@@ -53,6 +54,12 @@ void TelnetTransport::loop() {
     // Handle reconnection
     if (!_connected && WiFi.isConnected()) {
         attemptReconnect();
+    }
+    
+    // Trigger UI update if connection state changed
+    if (wasConnected != _connected) {
+        extern void trigger_status_redraw();
+        trigger_status_redraw();
     }
 }
 
@@ -77,9 +84,16 @@ void TelnetTransport::attemptReconnect() {
         }
         
         if (connectionSuccess) {
+            bool wasConnected = _connected;
             _connected = true;
             _reconnectInterval = 2000; // Reset reconnect interval on successful connection
             dbg_printf("TelnetTransport: Connected successfully\n");
+            
+            // Trigger UI update if connection state changed
+            if (!wasConnected) {
+                extern void trigger_status_redraw();
+                trigger_status_redraw();
+            }
         } else {
             _connected = false;
             // Exponential backoff, but cap at max interval
