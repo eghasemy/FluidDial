@@ -1,0 +1,21 @@
+// Copyright (c) 2023 Barton Dring
+// Use of this source code is governed by a GPLv3 license that can be found in the LICENSE file.
+
+#pragma once
+
+#ifdef USE_WIFI_PENDANT
+
+// Network storage interface for WiFi pendant configuration
+// Handles persistent storage of network credentials and settings
+
+class NetStore {
+public:
+    static bool init();
+    static bool saveWifiCredentials(const char* ssid, const char* password);
+    static bool loadWifiCredentials(char* ssid, size_t ssidLen, char* password, size_t passwordLen);
+    static bool saveFluidNCHost(const char* host, int port);
+    static bool loadFluidNCHost(char* host, size_t hostLen, int& port);
+    static void clear();
+};
+
+#endif // USE_WIFI_PENDANT
