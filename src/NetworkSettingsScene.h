@@ -16,6 +16,7 @@ private:
     char _host[64];
     int _port;
     char _transport[16];
+    char _connection_type[16];
     
     // UI state
     int _current_field;
@@ -26,7 +27,8 @@ private:
     
     // Field indices
     enum FieldIndex {
-        FIELD_SSID = 0,
+        FIELD_CONNECTION_TYPE = 0,
+        FIELD_SSID,
         FIELD_PASSWORD,
         FIELD_HOST,
         FIELD_PORT,

@@ -155,4 +155,78 @@ bool NetStore::netLoad(char* ssid, size_t ssidLen, char* password, size_t passwo
     return true;
 }
 
+// Extended functions with connection type
+bool NetStore::netSaveWithConnectionType(const char* ssid, const char* password, const char* host, int port, 
+                                        const char* transport, const char* connection_type) {
+    JsonDocument doc;
+    
+    // Set values, using defaults where appropriate
+    doc["ssid"] = ssid ? ssid : "";
+    doc["pass"] = password ? password : "";
+    doc["host"] = host ? host : "fluidnc.local";
+    doc["port"] = port > 0 ? port : 81;
+    doc["transport"] = transport ? transport : "ws";
+    doc["connection_type"] = connection_type ? connection_type : "WiFi";
+    
+    File file = LittleFS.open(NET_CONFIG_FILE, "w");
+    if (!file) {
+        return false;
+    }
+    
+    bool success = (serializeJson(doc, file) > 0);
+    file.close();
+    
+    return success;
+}
+
+bool NetStore::netLoadWithConnectionType(char* ssid, size_t ssidLen, char* password, size_t passwordLen, 
+                                        char* host, size_t hostLen, int& port, char* transport, size_t transportLen,
+                                        char* connection_type, size_t connectionTypeLen) {
+    // Set defaults first
+    if (ssid && ssidLen > 0) ssid[0] = '\0';
+    if (password && passwordLen > 0) password[0] = '\0';
+    if (host && hostLen > 0) strlcpy(host, "fluidnc.local", hostLen);
+    port = 81;
+    if (transport && transportLen > 0) strlcpy(transport, "ws", transportLen);
+    if (connection_type && connectionTypeLen > 0) strlcpy(connection_type, "WiFi", connectionTypeLen);
+    
+    // Try to load from file
+    if (!LittleFS.exists(NET_CONFIG_FILE)) {
+        return false; // Missing file → defaults apply
+    }
+    
+    File file = LittleFS.open(NET_CONFIG_FILE, "r");
+    if (!file) {
+        return false;
+    }
+    
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, file);
+    file.close();
+    
+    if (error) {
+        return false; // Parse error → defaults apply
+    }
+    
+    // Load values from JSON, keeping defaults for missing keys
+    if (ssid && ssidLen > 0) {
+        strlcpy(ssid, doc["ssid"] | "", ssidLen);
+    }
+    if (password && passwordLen > 0) {
+        strlcpy(password, doc["pass"] | "", passwordLen);
+    }
+    if (host && hostLen > 0) {
+        strlcpy(host, doc["host"] | "fluidnc.local", hostLen);
+    }
+    port = doc["port"] | 81;
+    if (transport && transportLen > 0) {
+        strlcpy(transport, doc["transport"] | "ws", transportLen);
+    }
+    if (connection_type && connectionTypeLen > 0) {
+        strlcpy(connection_type, doc["connection_type"] | "WiFi", connectionTypeLen);
+    }
+    
+    return true;
+}
+
 #endif // USE_WIFI_PENDANT

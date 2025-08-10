@@ -35,9 +35,10 @@ const char* NetworkSettingsScene::keyboard_layout_numbers[4][10] = {
     { "ABC", " ", "\\", "←", "→", "SAVE", "TEST", "EXIT", "", "" } 
 };
 
-static const char* field_names[] = { "SSID:", "Password:", "Host/IP:", "Port:", "Transport:" };
+static const char* field_names[] = { "Connection:", "SSID:", "Password:", "Host/IP:", "Port:", "Transport:" };
 
 static const char* transport_options[] = { "ws", "tcp" };
+static const char* connection_options[] = { "Serial", "WiFi" };
 
 void NetworkSettingsScene::onEntry(void* arg) {
     loadNetworkSettings();
@@ -55,42 +56,39 @@ void NetworkSettingsScene::onExit() {
 }
 
 void NetworkSettingsScene::loadNetworkSettings() {
-    // Load current network settings from storage
-    NetStore::netLoad(_ssid, sizeof(_ssid), _password, sizeof(_password), _host, sizeof(_host), _port, _transport, sizeof(_transport));
+    // Load current network settings from storage including connection type
+    NetStore::netLoadWithConnectionType(_ssid, sizeof(_ssid), _password, sizeof(_password), 
+                                       _host, sizeof(_host), _port, _transport, sizeof(_transport),
+                                       _connection_type, sizeof(_connection_type));
 }
 
 void NetworkSettingsScene::saveNetworkSettings() {
-    // Save current settings to /net.json
-    bool success = NetStore::netSave(_ssid, _password, _host, _port, _transport);
+    // Save current settings to /net.json including connection type
+    bool success = NetStore::netSaveWithConnectionType(_ssid, _password, _host, _port, _transport, _connection_type);
 
     if (success) {
-        // Also update transport configuration so the transport layer gets the new settings
-        TransportConfig::setHost(_host);
-        TransportConfig::setPort(_port);
-        TransportConfig::setTransportType(
-            (strcmp(_transport, "tcp") == 0) ? TransportConfig::TELNET : TransportConfig::WEBSOCKET
-        );
-        // Save transport config to persistent storage
-        TransportConfig::saveConfig();
-        
-        // Invalidate transport config cache so next load reads updated values
-        TransportConfig::invalidateCache();
+        // Only update transport configuration if using WiFi connection
+        if (strcmp(_connection_type, "WiFi") == 0) {
+            // Update transport configuration so the transport layer gets the new settings
+            TransportConfig::setHost(_host);
+            TransportConfig::setPort(_port);
+            TransportConfig::setTransportType(
+                (strcmp(_transport, "tcp") == 0) ? TransportConfig::TELNET : TransportConfig::WEBSOCKET
+            );
+            // Save transport config to persistent storage
+            TransportConfig::saveConfig();
+            
+            // Invalidate transport config cache so next load reads updated values
+            TransportConfig::invalidateCache();
+        }
         
         showTestResult(true, "Settings saved!");
         // Reload settings to ensure UI reflects what was actually saved
         loadNetworkSettings();
         reDisplay();
         
-        // Force transport reconnection with new settings
-        if (wifiReady()) {
-            // Disconnect WiFi and force transport to reconnect
-            NetConfig::disconnectWifi();
-            delay_ms(1000);  // Brief delay before reconnect attempt
-            wifiConnectAsync();
-            // Force transport re-selection after WiFi reconnects
-            delay_ms(2000);  // Give WiFi time to reconnect
-            forceTransportReconnect(); // Force recreation with updated config
-        }
+        // Force transport reconnection based on selected connection type
+        forceTransportReconnectByType(_connection_type);
     } else {
         showTestResult(false, "Save failed!");
     }
@@ -102,7 +100,14 @@ bool NetworkSettingsScene::testNetworkConnection() {
     refreshDisplay();
     delay_ms(500);
 
-    // Try to connect with current settings
+    // Check connection type selection
+    if (strcmp(_connection_type, "Serial") == 0) {
+        // For serial connection, just check if serial transport is available
+        showTestResult(true, "Serial ready");
+        return true;
+    }
+
+    // For WiFi connection, test WiFi and FluidNC connectivity
     bool wifi_success = NetConfig::connectWifi(_ssid, _password);
     if (!wifi_success) {
         showTestResult(false, "WiFi failed");
@@ -227,8 +232,18 @@ void NetworkSettingsScene::onEncoder(int delta) {
             current_pos += step;
         }
     } else if (_editing) {
+        // Special handling for connection type field - cycle through options
+        if (_current_field == FIELD_CONNECTION_TYPE) {
+            // Absolute normalization for connection type switching
+            if (delta > 0) {
+                _edit_buffer = (_edit_buffer == "Serial") ? "WiFi" : "Serial";
+            } else {
+                _edit_buffer = (_edit_buffer == "WiFi") ? "Serial" : "WiFi";
+            }
+            reDisplay();
+        }
         // Special handling for transport field - cycle through options
-        if (_current_field == FIELD_TRANSPORT) {
+        else if (_current_field == FIELD_TRANSPORT) {
             // Absolute normalization for transport switching
             if (delta > 0) {
                 _edit_buffer = (_edit_buffer == "ws") ? "tcp" : "ws";
@@ -252,11 +267,20 @@ void NetworkSettingsScene::onEncoder(int delta) {
 }
 
 void NetworkSettingsScene::startEditing() {
-    _editing         = true;
-    _keyboard_active = true;
+    _editing = true;
+    
+    // Connection type and transport fields use cycling, not keyboard
+    if (_current_field == FIELD_CONNECTION_TYPE || _current_field == FIELD_TRANSPORT) {
+        _keyboard_active = false;
+    } else {
+        _keyboard_active = true;
+    }
 
     // Set edit buffer to current field value
     switch (_current_field) {
+        case FIELD_CONNECTION_TYPE:
+            _edit_buffer = _connection_type;
+            break;
         case FIELD_SSID:
             _edit_buffer = _ssid;
             break;
@@ -287,6 +311,15 @@ void NetworkSettingsScene::stopEditing() {
 void NetworkSettingsScene::commitEdit() {
     // Apply edit buffer to current field
     switch (_current_field) {
+        case FIELD_CONNECTION_TYPE:
+            // Validate connection type
+            if (_edit_buffer == "Serial" || _edit_buffer == "WiFi") {
+                strlcpy(_connection_type, _edit_buffer.c_str(), sizeof(_connection_type));
+            } else {
+                strlcpy(_connection_type, "WiFi", sizeof(_connection_type));  // Default to WiFi
+                showTestResult(false, "Invalid connection type, using WiFi");
+            }
+            break;
         case FIELD_SSID:
             // Allow clearing SSID field (for new network setup)
             strlcpy(_ssid, _edit_buffer.c_str(), sizeof(_ssid));
@@ -434,6 +467,9 @@ void NetworkSettingsScene::drawField(int field_index, int y) {
         }
     } else {
         switch (field_index) {
+            case FIELD_CONNECTION_TYPE:
+                value = _connection_type;
+                break;
             case FIELD_SSID:
                 value = _ssid;
                 break;

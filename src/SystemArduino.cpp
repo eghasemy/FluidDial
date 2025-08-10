@@ -165,6 +165,50 @@ void forceTransportReconnect() {
     transport->begin();
     dbg_printf("Transport: Falling back to Serial transport\n");
 }
+
+void forceTransportReconnectByType(const char* connection_type) {
+    // Force disconnect current transport and recreate based on user selection
+    if (transport && transport != &serialTransport) {
+        delete transport; // Clean up old transport
+    }
+    transport = nullptr;
+    
+    if (strcmp(connection_type, "Serial") == 0) {
+        // User selected Serial - use serial transport regardless of WiFi status
+        transport = &serialTransport;
+        transport->begin();
+        dbg_printf("Transport: Forced to Serial transport by user selection\n");
+        return;
+    }
+    
+    // User selected WiFi - only use WiFi transport
+    if (strcmp(connection_type, "WiFi") == 0) {
+        if (!wifiReady()) {
+            dbg_printf("Transport: WiFi selected but not ready\n");
+            // Fallback to serial for now, but user will see connection error
+            transport = &serialTransport;
+            transport->begin();
+            return;
+        }
+        
+        // Try to create WiFi transport with updated config
+        Transport* wifiTransport = TransportFactory::createTransport();
+        if (wifiTransport && wifiTransport->begin()) {
+            transport = wifiTransport;
+            dbg_printf("Transport: Forced to WiFi transport by user selection\n");
+            return;
+        } else {
+            // Failed to create WiFi transport, clean up
+            if (wifiTransport) {
+                delete wifiTransport;
+            }
+            dbg_printf("Transport: Failed to create WiFi transport, user selected WiFi but connection failed\n");
+            // Don't fallback to serial when user explicitly chose WiFi
+            transport = &serialTransport;
+            transport->begin();
+        }
+    }
+}
 #endif
 
 // We use the ESP-IDF UART driver instead of the Arduino
