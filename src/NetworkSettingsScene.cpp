@@ -114,6 +114,7 @@ void NetworkSettingsScene::onDialButtonPress() {
         } else if (strcmp(key, "DEL") == 0) {
             deleteChar();
         } else if (strcmp(key, "SAVE") == 0) {
+            commitEdit();  // First commit the current edit to the field
             saveNetworkSettings();
         } else if (strcmp(key, "TEST") == 0) {
             testNetworkConnection();
@@ -140,6 +141,7 @@ void NetworkSettingsScene::onDialButtonPress() {
 
 void NetworkSettingsScene::onGreenButtonPress() {
     if (_keyboard_active) {
+        commitEdit();  // Commit current edit to field
         stopEditing();
     } else if (_editing) {
         // Commit current edit
