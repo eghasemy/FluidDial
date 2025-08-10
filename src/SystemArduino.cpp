@@ -6,6 +6,7 @@
 #include "System.h"
 #include "FluidNCModel.h"
 #include "NVS.h"
+#include "transport/transport.h"
 
 #include <Esp.h>  // ESP.restart()
 
@@ -13,6 +14,65 @@
 #include "hal/uart_hal.h"
 
 uart_port_t fnc_uart_port;
+
+// Transport implementation
+// Serial transport implementation for UART communication
+class SerialTransport : public Transport {
+private:
+    bool _initialized = false;
+
+public:
+    bool begin() override {
+        _initialized = true;
+        return true;
+    }
+    
+    void loop() override {
+        // For UART, no periodic tasks needed
+    }
+    
+    bool isConnected() override {
+        return _initialized;
+    }
+    
+    void sendLine(const char* line, int timeout = 2000) override {
+        if (!line) return;
+        
+        const char* p = line;
+        while (*p) {
+            putChar(*p);
+            p++;
+        }
+        putChar('\r');
+        putChar('\n');
+    }
+    
+    void sendRT(uint8_t c) override {
+        putChar(c);
+    }
+    
+    int getChar() override {
+        return fnc_getchar();
+    }
+    
+    void putChar(uint8_t c) override {
+        fnc_putchar(c);
+    }
+    
+    void resetFlowControl() override {
+        fnc_putchar(0x11);
+        uart_ll_force_xon(fnc_uart_port);
+    }
+};
+
+// Global transport instance
+static SerialTransport serialTransport;
+Transport* transport = &serialTransport;
+
+// Transport factory implementation
+Transport* TransportFactory::createTransport() {
+    return &serialTransport;
+}
 
 // We use the ESP-IDF UART driver instead of the Arduino
 // HardwareSerial driver so we can use software (XON/XOFF)
@@ -123,13 +183,22 @@ void init_system() {
         return;
     }
 
+    // Initialize transport layer
+    if (transport) {
+        transport->begin();
+    }
+
     // Make an offscreen canvas that can be copied to the screen all at once
     canvas.setColorDepth(8);
     canvas.createSprite(240, 240);  // display.width(), display.height());
 }
 void resetFlowControl() {
-    fnc_putchar(0x11);
-    uart_ll_force_xon(fnc_uart_port);
+    if (transport) {
+        transport->resetFlowControl();
+    } else {
+        fnc_putchar(0x11);
+        uart_ll_force_xon(fnc_uart_port);
+    }
 }
 
 extern "C" int milliseconds() {
