@@ -140,12 +140,10 @@ void NetworkSettingsScene::onTouchClick() {
 void NetworkSettingsScene::onEncoder(int delta) {
     if (_keyboard_active) {
         // Navigate through keyboard keys in linear fashion (left-to-right, top-to-bottom)
+        // Normalize delta to prevent jumping multiple keys
+        int step = (delta > 0) ? 1 : -1;
         int current_pos = _keyboard_row * 10 + _keyboard_col;
-        if (delta > 0) {
-            current_pos++;
-        } else {
-            current_pos--;
-        }
+        current_pos += step;
 
         // Find next valid key position
         int total_keys = 40;  // 4 rows * 10 cols
@@ -167,11 +165,7 @@ void NetworkSettingsScene::onEncoder(int delta) {
             }
 
             // Move to next position and continue searching
-            if (delta > 0) {
-                current_pos++;
-            } else {
-                current_pos--;
-            }
+            current_pos += step;
         }
     } else if (_editing) {
         // Special handling for transport field - cycle through options
@@ -276,7 +270,9 @@ void NetworkSettingsScene::cancelEdit() {
 }
 
 void NetworkSettingsScene::moveCursor(int delta) {
-    _cursor_pos += delta;
+    // Normalize delta to prevent jumping multiple characters
+    int step = (delta > 0) ? 1 : -1;
+    _cursor_pos += step;
     if (_cursor_pos < 0)
         _cursor_pos = 0;
     if (_cursor_pos > (int)_edit_buffer.length())
@@ -341,7 +337,7 @@ void NetworkSettingsScene::drawField(int field_index, int y) {
     bool is_editing = is_current && _editing;
 
     // Field name
-    text(field_names[field_index], 10, y, is_current ? GREEN : WHITE, SMALL, middle_left);
+    text(field_names[field_index], 10, y, is_current ? GREEN : WHITE, TINY, middle_left);
 
     // Field value
     std::string value;
@@ -381,7 +377,7 @@ void NetworkSettingsScene::drawField(int field_index, int y) {
     int text_color = is_editing ? WHITE : (is_current ? YELLOW : LIGHTGREY);
 
     canvas.fillRoundRect(75, y - 8, 155, 16, 2, bg_color);
-    text(value.c_str(), 80, y, text_color, SMALL, middle_left);
+    text(value.c_str(), 80, y, text_color, TINY, middle_left);
 }
 
 void NetworkSettingsScene::drawSoftKeyboard() {
@@ -436,7 +432,7 @@ void NetworkSettingsScene::showTestResult(bool success, const char* message) {
     // Show result in status area temporarily
     int color = success ? GREEN : RED;
     canvas.fillRoundRect(10, 110, 220, 20, 5, BLACK);
-    centered_text(message, 120, color, SMALL);
+    centered_text(message, 120, color, TINY);
     refreshDisplay();
 }
 
@@ -445,7 +441,7 @@ void NetworkSettingsScene::reDisplay() {
     drawStatus();
 
     // Title
-    centered_text("Network Settings", 30, WHITE, MEDIUM);
+    centered_text("Network Settings", 30, WHITE, TINY);
 
     // Draw input fields
     int field_y = 60;

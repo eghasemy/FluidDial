@@ -131,7 +131,7 @@ void drawStatus() {
         centered_text(my_state_string, y + height / 2 - 4, fgColor, SMALL);
         centered_text(alarm_name_short[lastAlarm], y + height / 2 + 12, fgColor);
     } else {
-        centered_text(my_state_string, y + height / 2 + 3, fgColor, MEDIUM);
+        centered_text(my_state_string, y + height / 2 + 3, fgColor, SMALL);
     }
 }
 
@@ -306,7 +306,7 @@ void drawError() {
         if ((milliseconds() - errorExpire) < 0) {
             canvas.fillCircle(120, 120, 95, RED);
             drawCircle(120, 120, 95, 5, WHITE);
-            centered_text("Error", 95, WHITE, MEDIUM);
+            centered_text("Error", 95, WHITE, SMALL);
             centered_text(decode_error_number(lastError), 140, WHITE, TINY);
         } else {
             lastError = 0;
