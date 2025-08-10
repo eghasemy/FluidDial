@@ -169,7 +169,7 @@ void send_line(const char* s, int timeout) {
     if (transport) {
         transport->sendLine(s, timeout);
     } else {
-        // Fallback to GrblParser if transport not available
+        // Fallback to GrblParser if transport not available  
         fnc_send_line(s, timeout);
     }
     dbg_println(s);
@@ -216,8 +216,6 @@ extern "C" void show_state(const char* state_string) {
         if (state == Disconnected) {
             if (transport) {
                 transport->sendRT((realtime_cmd_t)0x0c);  // Ctrl-L - echo off
-            } else {
-                fnc_realtime((realtime_cmd_t)0x0c);       // Ctrl-L - echo off
             }
             send_line("$G");                     // Refresh GCode modes
             send_line("$G");                     // Refresh GCode modes
@@ -310,7 +308,8 @@ void request_status_report() {
         transport->sendRT(0x11);        // XON; request software flow control
         transport->sendRT(StatusReport); // Request fresh status
     } else {
-        fnc_putchar(0x11);               // XON; request software flow control
+        // Fallback to direct calls (should rarely be used)
+        fnc_putchar(0x11);               // XON; request software flow control  
         fnc_realtime(StatusReport);      // Request fresh status
     }
     next_ping_ms = milliseconds() + ping_interval_ms;
