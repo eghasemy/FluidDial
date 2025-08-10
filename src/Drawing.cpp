@@ -6,6 +6,10 @@
 #include "alarm.h"
 #include <map>
 
+#ifdef USE_WIFI_PENDANT
+#include "FluidNCModel.h"
+#endif
+
 void drawBackground(int color) {
     canvas.fillSprite(color);
 }
@@ -152,6 +156,30 @@ void drawStatusSmall(int y) {
     }
     centered_text(my_state_string, y + height / 2 + 3, stateFGColors[state], SMALL);
 }
+
+#ifdef USE_WIFI_PENDANT
+#include "transport/transport.h"
+
+void drawConnectionStatus(int x, int y) {
+    // Draw a small connection indicator
+    bool connected = false;
+    if (transport) {
+        connected = transport->isConnected();
+    }
+    
+    // Draw connection icon (small circle)
+    int radius = 4;
+    int color = connected ? GREEN : RED;
+    canvas.fillCircle(x, y, radius, color);
+    
+    // Add a small "C" for connected or "D" for disconnected next to the circle
+    const char* status_char = connected ? "C" : "D";
+    canvas.setTextColor(color);
+    canvas.setTextSize(1);
+    canvas.setCursor(x + radius + 2, y - 3);
+    canvas.print(status_char);
+}
+#endif
 
 Stripe::Stripe(int x, int y, int width, int height, fontnum_t font) : _x(x), _y(y), _width(width), _height(height), _font(font) {}
 

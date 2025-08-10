@@ -65,6 +65,10 @@ void drawStatus();
 void drawStatusTiny(int y);
 void drawStatusSmall(int y);
 
+#ifdef USE_WIFI_PENDANT
+void drawConnectionStatus(int x, int y);
+#endif
+
 void drawFilledCircle(int x, int y, int radius, int fillcolor);
 void drawFilledCircle(Point xy, int radius, int fillcolor);
 

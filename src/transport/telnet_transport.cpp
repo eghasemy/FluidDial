@@ -5,6 +5,7 @@
 
 #include "telnet_transport.h"
 #include "System.h"
+#include <ESPmDNS.h>
 
 TelnetTransport::TelnetTransport(const char* host, int port) : _host(host), _port(port) {
 }
@@ -60,9 +61,24 @@ void TelnetTransport::attemptReconnect() {
     if (now - _lastReconnectAttempt >= _reconnectInterval) {
         dbg_printf("TelnetTransport: Attempting reconnect to %s:%d\n", _host.c_str(), _port);
         
-        if (_client.connect(_host.c_str(), _port)) {
+        // Check if hostname ends with .local and attempt mDNS resolution first
+        bool connectionSuccess = false;
+        if (_host.endsWith(".local")) {
+            IPAddress mdnsIP = resolveMdnsHost(_host.c_str());
+            if (mdnsIP != INADDR_NONE) {
+                dbg_printf("TelnetTransport: mDNS resolved %s to %s\n", _host.c_str(), mdnsIP.toString().c_str());
+                connectionSuccess = _client.connect(mdnsIP, _port);
+            } else {
+                dbg_printf("TelnetTransport: mDNS resolution failed, trying DNS\n");
+                connectionSuccess = _client.connect(_host.c_str(), _port);
+            }
+        } else {
+            connectionSuccess = _client.connect(_host.c_str(), _port);
+        }
+        
+        if (connectionSuccess) {
             _connected = true;
-            _reconnectInterval = 1500; // Reset reconnect interval on successful connection
+            _reconnectInterval = 2000; // Reset reconnect interval on successful connection
             dbg_printf("TelnetTransport: Connected successfully\n");
         } else {
             _connected = false;
@@ -73,6 +89,33 @@ void TelnetTransport::attemptReconnect() {
         
         _lastReconnectAttempt = now;
     }
+}
+
+IPAddress TelnetTransport::resolveMdnsHost(const char* hostname) {
+    // Initialize mDNS if not already done
+    if (!MDNS.begin("fluiddial")) {
+        dbg_printf("TelnetTransport: mDNS initialization failed\n");
+        return INADDR_NONE;
+    }
+    
+    // Extract hostname without .local suffix for mDNS query
+    String hostWithoutLocal = String(hostname);
+    if (hostWithoutLocal.endsWith(".local")) {
+        hostWithoutLocal = hostWithoutLocal.substring(0, hostWithoutLocal.length() - 6);
+    }
+    
+    dbg_printf("TelnetTransport: Resolving mDNS hostname: %s\n", hostWithoutLocal.c_str());
+    
+    // Query mDNS for the hostname
+    IPAddress serverIP = MDNS.queryHost(hostWithoutLocal);
+    
+    if (serverIP == INADDR_NONE) {
+        dbg_printf("TelnetTransport: mDNS query failed for %s\n", hostWithoutLocal.c_str());
+    } else {
+        dbg_printf("TelnetTransport: mDNS resolved %s to %s\n", hostWithoutLocal.c_str(), serverIP.toString().c_str());
+    }
+    
+    return serverIP;
 }
 
 bool TelnetTransport::isConnected() {

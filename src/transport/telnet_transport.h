@@ -7,6 +7,7 @@
 
 #include "transport.h"
 #include <WiFi.h>
+#include <ESPmDNS.h>
 
 // Telnet transport implementation for FluidNC communication
 class TelnetTransport : public Transport {
@@ -17,10 +18,11 @@ private:
     String _host;
     int _port;
     unsigned long _lastReconnectAttempt = 0;
-    unsigned long _reconnectInterval = 1500; // Start with 1.5s
-    const unsigned long _maxReconnectInterval = 5000; // Max 5s
+    unsigned long _reconnectInterval = 2000; // Start with 2s  
+    const unsigned long _maxReconnectInterval = 10000; // Max 10s for faster recovery
     
     void attemptReconnect();
+    IPAddress resolveMdnsHost(const char* hostname);
     
 public:
     TelnetTransport(const char* host, int port);
