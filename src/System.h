@@ -48,6 +48,7 @@ void init_system();
 
 #ifdef USE_WIFI_PENDANT
 void init_wifi_transport();
+void selectTransport();
 #endif
 
 void ackBeep();
