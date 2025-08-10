@@ -130,12 +130,8 @@ void ackBeep() {
 }
 
 bool ui_locked() {
-#ifdef USE_WIFI_PENDANT
-    // For WiFi pendant mode, check WiFi connection status
-    if (!NetConfig::isWifiConnected()) {
-        return true; // Lock UI when WiFi is not connected
-    }
-#endif
+    // Allow UI access for configuration even when WiFi is not connected
+    // The application logic handles what features are available when disconnected
     return false;
 }
 

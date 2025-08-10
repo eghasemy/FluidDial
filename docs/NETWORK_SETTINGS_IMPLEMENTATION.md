@@ -94,3 +94,15 @@ This implementation fully satisfies all acceptance criteria:
 - ✅ Test shows success/failure cleanly
 - ✅ Complete soft keyboard with password masking
 - ✅ All required network parameters editable
+
+## Fix for Network Settings Access Issue
+
+**Issue #30 - "Not able to enter network settings"**
+
+Problem: CYD pendant would lock UI when not connected to WiFi, preventing access to network settings (catch-22).
+
+**Solution:** Modified `ui_locked()` function in both hardware implementations:
+- `src/HardwareM5Dial.cpp`: Removed WiFi connection check, always allows UI access
+- `src/Hardware2432.cpp`: Removed WiFi connection check, only respects hardware lockout pin
+
+**Result:** Users can now access Settings → Network even when WiFi is disconnected, enabling initial network configuration.
