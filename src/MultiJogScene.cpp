@@ -299,14 +299,17 @@ public:
     }
 
     void start_mpg_jog(int delta) {
-        // e.g. $J=G91F1000X-10000
-        std::string cmd(inInches ? "$J=G91F400" : "$J=G91F10000");
+        // e.g. $J=G91 G21 X-10000 F10000
+        std::string cmd("$J=G91");
+        cmd += inInches ? "G20" : "G21";
         for (int axis = 0; axis < num_axes; ++axis) {
             if (selected(axis)) {
                 cmd += axisNumToChar(axis);
                 cmd += e4_to_cstr(delta * distance(axis), inInches ? 3 : 2);
             }
         }
+        cmd += "F";
+        cmd += inInches ? "400" : "10000";
         send_line(cmd.c_str());
     }
     void start_button_jog(bool negative) {
