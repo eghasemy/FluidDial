@@ -570,7 +570,6 @@ bool ui_locked() {
     
     return locked;
 }
-}
 
 bool in_rect(Point test, Point xy, Point wh) {
     return test.x >= xy.x && test.x < (xy.x + wh.x) && test.y >= xy.y && test.y < (xy.y + wh.y);
