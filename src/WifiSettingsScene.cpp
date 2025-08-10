@@ -12,6 +12,11 @@ extern Scene aboutScene;
 
 void WifiSettingsScene::onEntry(void* arg) {
     _selectedItem = 0;
+    
+    // Request current WiFi information when entering the scene
+    if (state != Disconnected) {
+        send_line("$I");  // Request settings including WiFi info
+    }
 }
 
 void WifiSettingsScene::onDialButtonPress() {
@@ -43,25 +48,24 @@ void WifiSettingsScene::onTouchClick() {
 void WifiSettingsScene::executeSelectedItem() {
     switch (_selectedItem) {
         case 0: // Mode: STA
-            send_line("$Wifi/Mode=STA");
+            send_line("$ESP/WiFi/Mode=STA");
             ackBeep();
             break;
         case 1: // Mode: AP
-            send_line("$Wifi/Mode=AP");
+            send_line("$ESP/WiFi/Mode=AP");
             ackBeep();
             break;
         case 2: // Mode: Off
-            send_line("$Wifi/Mode=Off");
+            send_line("$ESP/WiFi/Mode=Off");
             ackBeep();
             break;
         case 3: // STA Connect
-            // This would ideally open a submenu for SSID/password entry
-            // For now, just request current WiFi status
-            send_line("$Wifi/ListAPs");
+            // Request current WiFi settings to see what's configured
+            send_line("$ESP");
             ackBeep();
             break;
         case 4: // Scan Networks
-            send_line("$Wifi/ListAPs");
+            send_line("$ESP/WiFi/ListAPs");
             ackBeep();
             break;
         case 5: // Screen Layout
@@ -89,7 +93,17 @@ void WifiSettingsScene::drawMenu() {
             text(">", 20, y, GREEN, SMALL, top_left);
         }
         
-        text(_menuItems[i], 40, y, color, SMALL, top_left);
+        // Show current WiFi mode with indicator
+        std::string item_text = _menuItems[i];
+        if (i < 3 && wifi_mode.length()) { // Mode items
+            if ((i == 0 && wifi_mode == "STA") ||
+                (i == 1 && wifi_mode == "AP") ||
+                (i == 2 && wifi_mode == "No Wifi")) {
+                item_text += " *";  // Mark current mode
+            }
+        }
+        
+        text(item_text.c_str(), 40, y, color, SMALL, top_left);
     }
 }
 
@@ -106,6 +120,22 @@ void WifiSettingsScene::reDisplay() {
     }
     
     drawMenu();
+    
+    // Show help text for selected item
+    const char* help_text = "";
+    switch (_selectedItem) {
+        case 0: help_text = "Connect to existing WiFi"; break;
+        case 1: help_text = "Create WiFi access point"; break;
+        case 2: help_text = "Disable WiFi completely"; break;
+        case 3: help_text = "Show current WiFi config"; break;
+        case 4: help_text = "Scan for nearby networks"; break;
+        case 5: help_text = "Change screen rotation"; break;
+        case 6: help_text = "Return to About scene"; break;
+    }
+    
+    if (strlen(help_text) > 0) {
+        centered_text(help_text, 200, DARKGREY, TINY);
+    }
     
     drawButtonLegends("Back", "Select", "");
     refreshDisplay();
