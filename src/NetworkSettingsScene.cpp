@@ -265,18 +265,16 @@ void NetworkSettingsScene::commitEdit() {
     // Apply edit buffer to current field
     switch (_current_field) {
         case FIELD_SSID:
-            if (_edit_buffer.length() > 0) {
-                strlcpy(_ssid, _edit_buffer.c_str(), sizeof(_ssid));
-            }
+            // Allow clearing SSID field (for new network setup)
+            strlcpy(_ssid, _edit_buffer.c_str(), sizeof(_ssid));
             break;
         case FIELD_PASSWORD:
             // Allow empty passwords for open networks
             strlcpy(_password, _edit_buffer.c_str(), sizeof(_password));
             break;
         case FIELD_HOST:
-            if (_edit_buffer.length() > 0) {
-                strlcpy(_host, _edit_buffer.c_str(), sizeof(_host));
-            }
+            // Allow clearing host field (user can enter new host)
+            strlcpy(_host, _edit_buffer.c_str(), sizeof(_host));
             break;
         case FIELD_PORT: {
             int port = atoi(_edit_buffer.c_str());
