@@ -151,10 +151,37 @@ void NetworkSettingsScene::onTouchClick() {
 
 void NetworkSettingsScene::onEncoder(int delta) {
     if (_keyboard_active) {
+        // Navigate through keyboard keys in linear fashion (left-to-right, top-to-bottom)
+        int current_pos = _keyboard_row * 10 + _keyboard_col;
         if (delta > 0) {
-            moveKeyboardCursor(0, 1);  // Move right
+            current_pos++;
         } else {
-            moveKeyboardCursor(0, -1); // Move left
+            current_pos--;
+        }
+        
+        // Find next valid key position
+        int total_keys = 40; // 4 rows * 10 cols
+        for (int i = 0; i < total_keys; i++) {
+            if (current_pos >= total_keys) current_pos = 0;
+            if (current_pos < 0) current_pos = total_keys - 1;
+            
+            int new_row = current_pos / 10;
+            int new_col = current_pos % 10;
+            
+            // Check if this position has a valid key
+            if (strlen(keyboard_layout[new_row][new_col]) > 0) {
+                _keyboard_row = new_row;
+                _keyboard_col = new_col;
+                reDisplay();
+                return;
+            }
+            
+            // Move to next position and continue searching
+            if (delta > 0) {
+                current_pos++;
+            } else {
+                current_pos--;
+            }
         }
     } else if (_editing) {
         // Special handling for transport field - cycle through options
@@ -169,8 +196,9 @@ void NetworkSettingsScene::onEncoder(int delta) {
             moveCursor(delta);
         }
     } else {
-        // Move between fields
-        _current_field += delta;
+        // Move between fields - normalize delta to prevent jumping multiple fields
+        int step = (delta > 0) ? 1 : -1;
+        _current_field += step;
         if (_current_field >= FIELD_COUNT) _current_field = 0;
         if (_current_field < 0) _current_field = FIELD_COUNT - 1;
         reDisplay();
