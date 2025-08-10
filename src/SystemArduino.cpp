@@ -10,6 +10,7 @@
 #ifdef USE_WIFI_PENDANT
 #include "transport/wifi_transport_factory.h"
 #include "transport/transport_config.h"
+#include "net/net_config.h"
 #include <WiFi.h>
 #endif
 
@@ -72,6 +73,7 @@ public:
 
 // Global transport instance
 #ifdef USE_WIFI_PENDANT
+static SerialTransport serialTransport; // Fallback for WiFi builds
 Transport* transport = nullptr; // Will be created dynamically for WiFi transports
 #else
 static SerialTransport serialTransport;
@@ -93,6 +95,47 @@ Transport* TransportFactory::createTransport() {
     return &serialTransport;
 #endif
 }
+
+#ifdef USE_WIFI_PENDANT
+// Select transport based on WiFi availability and settings
+void selectTransport() {
+    // If transport is already initialized and working, don't change it
+    if (transport && transport->isConnected()) {
+        return;
+    }
+    
+    // Check if WiFi is ready and we should use WiFi transport
+    if (wifiReady()) {
+        // Try to create WiFi transport
+        Transport* wifiTransport = TransportFactory::createTransport();
+        if (wifiTransport && wifiTransport->begin()) {
+            // Successfully created WiFi transport
+            if (transport && transport != &serialTransport) {
+                delete transport; // Clean up old transport if it's not the serial fallback
+            }
+            transport = wifiTransport;
+            dbg_printf("Transport: Using WiFi transport\n");
+            return;
+        } else {
+            // Failed to create WiFi transport, clean up
+            if (wifiTransport) {
+                delete wifiTransport;
+            }
+            dbg_printf("Transport: Failed to create WiFi transport, falling back to Serial\n");
+        }
+    }
+    
+    // Fall back to Serial transport
+    if (transport != &serialTransport) {
+        if (transport) {
+            delete transport; // Clean up old transport
+        }
+        transport = &serialTransport;
+        transport->begin();
+        dbg_printf("Transport: Using Serial transport\n");
+    }
+}
+#endif
 
 // We use the ESP-IDF UART driver instead of the Arduino
 // HardwareSerial driver so we can use software (XON/XOFF)
@@ -204,8 +247,8 @@ void init_system() {
     }
 
 #ifdef USE_WIFI_PENDANT
-    // For WiFi pendant, transport will be created once WiFi connection is established
-    // This will be handled in the main loop after WiFi is connected
+    // For WiFi pendant, select transport at boot based on WiFi availability
+    selectTransport();
 #else
     // Initialize transport layer for non-WiFi builds
     if (transport) {
@@ -221,17 +264,8 @@ void init_system() {
 #ifdef USE_WIFI_PENDANT
 // Initialize WiFi transport once WiFi connection is established
 void init_wifi_transport() {
-    if (transport == nullptr && WiFi.isConnected()) {
-        // Use configuration to determine transport type and settings
-        transport = TransportFactory::createTransport();
-        if (transport && transport->begin()) {
-            dbg_printf("WiFi transport initialized successfully\n");
-        } else {
-            dbg_printf("Failed to initialize WiFi transport\n");
-            delete transport;
-            transport = nullptr;
-        }
-    }
+    // Use the new selectTransport function which handles WiFi availability
+    selectTransport();
 }
 #endif
 void resetFlowControl() {
