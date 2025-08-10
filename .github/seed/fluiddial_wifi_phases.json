@@ -1,0 +1,193 @@
+{
+  "epic": {
+    "title": "Epic: FluidDial CYD Wi-Fi Support",
+    "overview": "Deliver Wi-Fi control for the CYD (ESP32-2432S028) FluidDial via WebSocket (:81) with Telnet fallback, on-device Network Settings, and resilient reconnects."
+  },
+  "phases": [
+    {
+      "number": 0,
+      "title": "Project Structure & Scaffolding",
+      "overview": "Introduce transport/ net modules without breaking UART builds.",
+      "tasks": [
+        "Create src/transport/{transport.h,transport_serial.cpp}",
+        "Create src/net/{net_store.h,net_store.cpp,net_config.h,net_config.cpp} (stubs)",
+        "Wire build guards (#ifdef USE_WIFI_PENDANT)"
+      ],
+      "acceptance": [
+        "UART build compiles and runs unchanged",
+        "New modules compile (no usage yet)"
+      ],
+      "labels": ["type:infra"]
+    },
+    {
+      "number": 1,
+      "title": "PlatformIO Env for CYD Wi-Fi",
+      "overview": "Add env:cyd_wifi with deps for WebSockets + ArduinoJson.",
+      "tasks": [
+        "Add env:cyd_wifi extending the current CYD env",
+        "Add lib_deps: links2004/WebSockets, ArduinoJson",
+        "Add build_flags: -DUSE_WIFI_PENDANT"
+      ],
+      "acceptance": [
+        "`pio run -e cyd_wifi` succeeds"
+      ]
+    },
+    {
+      "number": 2,
+      "title": "Transport Abstraction",
+      "overview": "Introduce Transport interface and SerialTransport implementation.",
+      "tasks": [
+        "Define Transport API (begin/loop/isConnected/sendLine/sendRT)",
+        "Implement SerialTransport and factory",
+        "Replace direct Serial.println/write with Transport usage"
+      ],
+      "acceptance": [
+        "UART build still works using Transport",
+        "No functional regressions"
+      ]
+    },
+    {
+      "number": 3,
+      "title": "Network Settings Storage",
+      "overview": "Add LittleFS-backed /net.json with ssid, pass, host, port, transport.",
+      "tasks": [
+        "Implement netLoad/netSave using ArduinoJson",
+        "Default host=fluidnc.local, port=81, transport=ws"
+      ],
+      "acceptance": [
+        "Missing file → defaults apply",
+        "Save then reboot → values persist"
+      ]
+    },
+    {
+      "number": 4,
+      "title": "Wi-Fi Connection Manager",
+      "overview": "Non-blocking Wi-Fi join and status, with reconnect backoff.",
+      "tasks": [
+        "wifiInit() mounts FS and loads config",
+        "wifiConnectAsync(): attempt join, non-blocking",
+        "wifiReady(): track WL_CONNECTED state",
+        "Disable controls while not connected",
+        "Call WiFi.setSleep(false) on connect"
+      ],
+      "acceptance": [
+        "UI remains responsive during connect attempts",
+        "Reconnect after AP loss without reboot"
+      ]
+    },
+    {
+      "number": 5,
+      "title": "WebSocket & Telnet Transports",
+      "overview": "Implement WSTransport and TelnetTransport with reconnect.",
+      "tasks": [
+        "WSTransport to ws://host:port/ using WebSocketsClient",
+        "TelnetTransport using WiFiClient",
+        "sendLine appends single newline; sendRT sends single byte",
+        "loop() pumps events without blocking",
+        "Auto-reconnect every 1.5–5s"
+      ],
+      "acceptance": [
+        "Can send `$I` and receive `ok` over WS",
+        "Jog-cancel (0x85) transmits reliably"
+      ]
+    },
+    {
+      "number": 6,
+      "title": "Wire Transport Selection",
+      "overview": "Select WS/Telnet based on saved settings; fallback to Serial.",
+      "tasks": [
+        "On boot: if USE_WIFI_PENDANT && wifiReady() use WS/Telnet; else Serial",
+        "link->loop() called each frame",
+        "Global access consistent with current app structure"
+      ],
+      "acceptance": [
+        "Wi-Fi build routes commands via chosen transport",
+        "UART-only build remains identical"
+      ]
+    },
+    {
+      "number": 7,
+      "title": "Network Settings UI (CYD)",
+      "overview": "On-device screen to edit SSID, password, host/IP, port, transport.",
+      "tasks": [
+        "Add Settings → Network screen",
+        "Implement Save (persist + reconnect) and Test ($I)",
+        "Mask password field; simple soft keyboard"
+      ],
+      "acceptance": [
+        "Editing + Save persists to /net.json",
+        "Test shows success/failure cleanly"
+      ]
+    },
+    {
+      "number": 8,
+      "title": "Command Mapping Integrity",
+      "overview": "Ensure jog + realtime commands go via transport without regressions.",
+      "tasks": [
+        "Bump jog: `$J=G91 G21 A±d Ff` per detent",
+        "Continuous jog: stream short $J; on release send 0x85",
+        "Realtime: `!` (hold), `~` (resume)"
+      ],
+      "acceptance": [
+        "Per-detent jog distances are correct",
+        "Release stops motion immediately"
+      ]
+    },
+    {
+      "number": 9,
+      "title": "Resilience & UX Polish",
+      "overview": "Reconnect/backoff, status badge, and optional mDNS resolve.",
+      "tasks": [
+        "Show Connected/Disconnected status",
+        "Backoff retry strategy",
+        "If host ends with .local, attempt mDNS before DNS"
+      ],
+      "acceptance": [
+        "Recovers within ~10–20s after controller reboot",
+        "No UI freezes during network churn"
+      ]
+    },
+    {
+      "number": 10,
+      "title": "Build Variants",
+      "overview": "Keep UART build, add Wi-Fi build, and document both.",
+      "tasks": [
+        "Ensure env:cyd (UART) & env:cyd_wifi (Wi-Fi) both build",
+        "Guard Wi-Fi code with USE_WIFI_PENDANT"
+      ],
+      "acceptance": [
+        "`pio run -e cyd` and `pio run -e cyd_wifi` succeed"
+      ]
+    },
+    {
+      "number": 11,
+      "title": "Manual Test Plan",
+      "overview": "Run the 7-step manual test across WS and Telnet.",
+      "tasks": [
+        "Wi-Fi join, connect to fluidnc.local:81",
+        "Jog Z 0.10 mm bump",
+        "Continuous jog + cancel",
+        "Feed hold/resume",
+        "Recovery after FluidNC power cycle",
+        "Telnet fallback test",
+        "Reboot → settings persist"
+      ],
+      "acceptance": [
+        "All steps pass on bench"
+      ]
+    },
+    {
+      "number": 12,
+      "title": "Docs & Safety Notes",
+      "overview": "Document usage, security, and E-stop caveats.",
+      "tasks": [
+        "README section for CYD Wi-Fi setup",
+        "Security note: unauthenticated WS/Telnet; use trusted LAN",
+        "Warn: physical wired E-stop required"
+      ],
+      "acceptance": [
+        "Docs merged and visible in repo"
+      ]
+    }
+  ]
+}

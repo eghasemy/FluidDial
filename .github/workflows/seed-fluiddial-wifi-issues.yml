@@ -1,0 +1,193 @@
+name: Seed FluidDial CYD Wi-Fi Issues
+
+on:
+  workflow_dispatch:
+    inputs:
+      assignee:
+        description: "Optional GitHub username to assign (e.g. you or Copilot agent)"
+        required: false
+        default: ""
+      start_date:
+        description: "Optional schedule start (YYYY-MM-DD) for milestone due dates"
+        required: false
+        default: ""
+      days_per_phase:
+        description: "Days per phase (if start_date set)"
+        required: false
+        default: "5"
+      dry_run:
+        description: "Show what would be created/updated without changing anything"
+        required: false
+        default: "false"
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Seed issues & milestones
+        uses: actions/github-script@v7
+        env:
+          INPUT_ASSIGNEE: ${{ github.event.inputs.assignee }}
+          INPUT_START_DATE: ${{ github.event.inputs.start_date }}
+          INPUT_DAYS_PER_PHASE: ${{ github.event.inputs.days_per_phase }}
+          INPUT_DRY_RUN: ${{ github.event.inputs.dry_run }}
+        with:
+          script: |
+            const fs = require('fs');
+
+            // ---- helpers ----------------------------------------------------
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+            const cfgPath = '.github/seed/fluiddial_wifi_phases.json';
+            if (!fs.existsSync(cfgPath)) {
+              core.setFailed(`Missing config: ${cfgPath}`);
+              return;
+            }
+            const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+
+            const assignee = (process.env.INPUT_ASSIGNEE || '').trim();
+            const dryRun = (process.env.INPUT_DRY_RUN || 'false').toLowerCase() === 'true';
+            const startDateStr = (process.env.INPUT_START_DATE || '').trim();
+            const daysPerPhase = parseInt(process.env.INPUT_DAYS_PER_PHASE || '5', 10);
+
+            function log(...a){ core.info(a.join(' ')); }
+            async function ensureLabel(name, color, description='') {
+              try {
+                await github.rest.issues.getLabel({owner, repo, name});
+                return;
+              } catch (e) {
+                // create if not exist
+              }
+              if (dryRun) { log(`[dry-run] create label: ${name}`); return; }
+              await github.rest.issues.createLabel({owner, repo, name, color, description});
+            }
+
+            async function findMilestoneByTitle(title) {
+              const { data } = await github.rest.issues.listMilestones({
+                owner, repo, state: 'open', per_page: 100
+              });
+              return data.find(m => m.title === title) || null;
+            }
+
+            async function ensureMilestone(title, description, due_on) {
+              const existing = await findMilestoneByTitle(title);
+              if (existing) return existing;
+              if (dryRun) { log(`[dry-run] create milestone: ${title}`); return { number: null, title }; }
+              const { data } = await github.rest.issues.createMilestone({ owner, repo, title, description, due_on });
+              return data;
+            }
+
+            async function findIssueByTitle(title) {
+              const { data } = await github.rest.search.issuesAndPullRequests({
+                q: `repo:${owner}/${repo} in:title "${title}"`,
+                per_page: 5,
+              });
+              return data.items.find(i => i.title === title) || null;
+            }
+
+            async function createOrUpdateIssue({ title, body, labels, milestone, assignees=[] }) {
+              const existing = await findIssueByTitle(title);
+              if (existing) {
+                if (dryRun) { log(`[dry-run] update issue: #${existing.number} ${title}`); return existing; }
+                const { data } = await github.rest.issues.update({
+                  owner, repo, issue_number: existing.number,
+                  body, labels, milestone: milestone?.number || null, assignees
+                });
+                return data;
+              }
+              if (dryRun) { log(`[dry-run] create issue: ${title}`); return { number: null, html_url: '', title }; }
+              const { data } = await github.rest.issues.create({
+                owner, repo, title, body, labels, milestone: milestone?.number || null, assignees
+              });
+              return data;
+            }
+
+            function mdChecklist(items) {
+              return items.map(t => `- [ ] ${t}`).join('\n');
+            }
+
+            function calcDue(start, index, daysPerPhase) {
+              if (!start) return undefined;
+              const d = new Date(start);
+              d.setDate(d.getDate() + (index * daysPerPhase));
+              // ISO string required by API
+              return d.toISOString();
+            }
+
+            // ---- seed labels -------------------------------------------------
+            const baseLabels = [
+              { name: 'epic',               color: '5319e7', desc: 'Top-level tracking issue' },
+              { name: 'feature:wifi',       color: '0e8a16', desc: 'Wi-Fi/websocket feature' },
+              { name: 'area:fluiddial-cyd', color: '1d76db', desc: 'CYD variant scope' },
+              { name: 'type:feature',       color: '0e8a16', desc: 'Feature work' },
+              { name: 'type:infra',         color: 'c5def5', desc: 'Scaffolding / infra' },
+            ];
+            for (const l of baseLabels) await ensureLabel(l.name, l.color, l.desc);
+
+            // also ensure per-phase labels
+            for (const ph of cfg.phases) {
+              await ensureLabel(`phase:${ph.number}`, 'fbca04', `Phase ${ph.number}`);
+            }
+
+            // ---- create/update milestones & issues ---------------------------
+            const createdPhaseIssues = [];
+
+            for (let i = 0; i < cfg.phases.length; i++) {
+              const ph = cfg.phases[i];
+              const milestoneTitle = `Phase ${ph.number} – ${ph.title}`;
+              const milestoneDesc  = ph.overview || '';
+              const due_on = calcDue(startDateStr, i, daysPerPhase);
+
+              const milestone = await ensureMilestone(milestoneTitle, milestoneDesc, due_on);
+
+              const title = `[Phase ${ph.number}] ${ph.title}`;
+              const body = [
+                `## Overview`,
+                ph.overview || '',
+                ``,
+                `## Tasks`,
+                mdChecklist(ph.tasks || []),
+                ``,
+                `## Acceptance Criteria`,
+                mdChecklist(ph.acceptance || []),
+                ph.references && ph.references.length
+                  ? `\n## References\n${ph.references.map(r => `- ${r}`).join('\n')}`
+                  : ''
+              ].join('\n');
+
+              const labels = ['area:fluiddial-cyd', 'feature:wifi', `phase:${ph.number}`, ...(ph.labels || []), 'type:feature'];
+              const assignees = assignee ? [assignee] : [];
+
+              const issue = await createOrUpdateIssue({ title, body, labels, milestone, assignees });
+              createdPhaseIssues.push(issue);
+            }
+
+            // ---- create/update epic -----------------------------------------
+            const epicTitle = cfg.epic?.title || 'Epic: FluidDial CYD Wi-Fi Support';
+            const epicLabels = ['epic', 'area:fluiddial-cyd', 'feature:wifi'];
+            const epicBody = [
+              `# ${epicTitle}`,
+              cfg.epic?.overview || 'Tracking all phases required to deliver Wi-Fi/WebSocket control for CYD FluidDial.',
+              ``,
+              `## Phases`,
+              ...createdPhaseIssues.map((iss, idx) => {
+                const ph = cfg.phases[idx];
+                const link = iss.html_url ? iss.html_url : `(pending)`;
+                const ref = iss.number ? `#${iss.number}` : `${iss.title}`;
+                return `- [ ] Phase ${ph.number}: ${ph.title} — ${iss.number ? `#${iss.number}` : iss.title}`;
+              }),
+              ``,
+              `> Tip: assign individual phase issues to Copilot or teammates as needed.`
+            ].join('\n');
+
+            const epic = await createOrUpdateIssue({
+              title: epicTitle,
+              body: epicBody,
+              labels: epicLabels,
+              milestone: null,
+              assignees: assignee ? [assignee] : []
+            });
+
+            log(`Seeding complete. Epic: ${epic.html_url || '(created/updated)'}`);
