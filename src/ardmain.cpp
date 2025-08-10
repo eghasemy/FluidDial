@@ -5,6 +5,7 @@
 #include "FileParser.h"
 #include "Scene.h"
 #include "AboutScene.h"
+#include "transport/transport.h"
 
 extern void base_display();
 extern void show_logo();
@@ -25,7 +26,11 @@ void setup() {
 
     dbg_printf("FluidNC Pendant %s\n", git_info);
 
-    fnc_realtime(StatusReport);  // Kick FluidNC into action
+    if (transport) {
+        transport->sendRT(StatusReport);  // Kick FluidNC into action using transport
+    } else {
+        fnc_realtime(StatusReport);       // Fallback to direct call
+    }
 
     // init_file_list();
 
@@ -34,6 +39,9 @@ void setup() {
 }
 
 void loop() {
+    if (transport) {
+        transport->loop();  // Handle transport-specific tasks
+    }
     fnc_poll();         // Handle messages from FluidNC
     dispatch_events();  // Handle dial, touch, buttons
 }

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a GPLv3 license that can be found in the LICENSE file.
 
 #include "Scene.h"
+#include "transport/transport.h"
 
 extern Scene menuScene;
 
@@ -25,10 +26,15 @@ public:
 
     void onDialButtonPress() {
         if (state == Cycle || state == Hold) {
-            if (overd_display == FRO)
-                fnc_realtime(FeedOvrReset);
-            else if (overd_display == SRO)
-                fnc_realtime(SpindleOvrReset);
+            if (overd_display == FRO) {
+                if (transport) {
+                    transport->sendRT(FeedOvrReset);
+                }
+            } else if (overd_display == SRO) {
+                if (transport) {
+                    transport->sendRT(SpindleOvrReset);
+                }
+            }
         } else {
             pop_scene();
         }
@@ -54,7 +60,9 @@ public:
             }
             reDisplay();
         }
-        fnc_realtime(StatusReport);  // sometimes you want an extra status
+        if (transport) {
+            transport->sendRT(StatusReport);  // sometimes you want an extra status
+        }
     }
 
     void onRedButtonPress() {
@@ -63,7 +71,9 @@ public:
                 if (alarm_is_critical()) {
                     // Critical alarm that must be hard-cleared with a CTRL-X reset
                     // since streaming execution of GCode is blocked
-                    fnc_realtime(Reset);
+                    if (transport) {
+                        transport->sendRT(Reset);
+                    }
                 } else {
                     // Non-critical alarm that can be soft-cleared
                     send_line("$X");
@@ -73,7 +83,9 @@ public:
             case Homing:
             case Hold:
             case DoorClosed:
-                fnc_realtime(Reset);
+                if (transport) {
+                    transport->sendRT(Reset);
+                }
                 break;
         }
     }
@@ -86,11 +98,15 @@ public:
     void onGreenButtonPress() {
         switch (state) {
             case Cycle:
-                fnc_realtime(FeedHold);
+                if (transport) {
+                    transport->sendRT(FeedHold);
+                }
                 break;
             case Hold:
             case DoorClosed:
-                fnc_realtime(CycleStart);
+                if (transport) {
+                    transport->sendRT(CycleStart);
+                }
                 break;
             case Alarm:
                 if (alarm_is_homing()) {
@@ -98,7 +114,9 @@ public:
                 }
                 break;
         }
-        fnc_realtime(StatusReport);
+        if (transport) {
+            transport->sendRT(StatusReport);
+        }
     }
 
     void onEncoder(int delta) {
@@ -106,16 +124,24 @@ public:
             switch (overd_display) {
                 case FRO:
                     if (delta > 0 && myFro < 200) {
-                        fnc_realtime(FeedOvrFinePlus);
+                        if (transport) {
+                            transport->sendRT(FeedOvrFinePlus);
+                        }
                     } else if (delta < 0 && myFro > 10) {
-                        fnc_realtime(FeedOvrFineMinus);
+                        if (transport) {
+                            transport->sendRT(FeedOvrFineMinus);
+                        }
                     }
                     break;
                 case SRO:
                     if (delta > 0 && mySro < 200) {
-                        fnc_realtime(SpindleOvrFinePlus);
+                        if (transport) {
+                            transport->sendRT(SpindleOvrFinePlus);
+                        }
                     } else if (delta < 0 && mySro > 10) {
-                        fnc_realtime(SpindleOvrFineMinus);
+                        if (transport) {
+                            transport->sendRT(SpindleOvrFineMinus);
+                        }
                     }
                     break;
                 case RT_FEED_SPEED:
