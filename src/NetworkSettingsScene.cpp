@@ -478,7 +478,7 @@ void NetworkSettingsScene::drawSoftKeyboard() {
                 text_color = WHITE;
                 canvas.fillRoundRect(x, y, key_width, key_height, 3, bg_color);
             } else if (strcmp(key, "SHIFT") == 0 || strcmp(key, "shift") == 0) {
-                bg_color   = PURPLE;
+                bg_color   = MAROON;
                 text_color = WHITE;
                 canvas.fillRoundRect(x, y, key_width, key_height, 3, bg_color);
             }
