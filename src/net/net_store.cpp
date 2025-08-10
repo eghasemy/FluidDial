@@ -23,7 +23,7 @@ bool NetStore::saveWifiCredentials(const char* ssid, const char* password) {
     char transport[16] = "ws";
     
     // Try to load existing host/port/transport settings
-    DynamicJsonDocument doc(512);
+    JsonDocument doc;
     File file = LittleFS.open(NET_CONFIG_FILE, "r");
     if (file) {
         if (deserializeJson(doc, file) == DeserializationError::Ok) {
@@ -52,7 +52,7 @@ bool NetStore::saveFluidNCHost(const char* host, int port) {
     char transport[16] = "ws";
     
     // Try to load existing WiFi/transport settings
-    DynamicJsonDocument doc(512);
+    JsonDocument doc;
     File file = LittleFS.open(NET_CONFIG_FILE, "r");
     if (file) {
         if (deserializeJson(doc, file) == DeserializationError::Ok) {
@@ -90,7 +90,7 @@ void NetStore::clear() {
 
 // Core JSON-based network settings storage functions
 bool NetStore::netSave(const char* ssid, const char* password, const char* host, int port, const char* transport) {
-    DynamicJsonDocument doc(512);
+    JsonDocument doc;
     
     // Set values, using defaults where appropriate
     doc["ssid"] = ssid ? ssid : "";
@@ -129,7 +129,7 @@ bool NetStore::netLoad(char* ssid, size_t ssidLen, char* password, size_t passwo
         return false;
     }
     
-    DynamicJsonDocument doc(512);
+    JsonDocument doc;
     DeserializationError error = deserializeJson(doc, file);
     file.close();
     

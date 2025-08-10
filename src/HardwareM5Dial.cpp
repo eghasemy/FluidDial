@@ -7,6 +7,9 @@
 #include "M5GFX.h"
 #include "Drawing.h"
 #include "HardwareM5Dial.hpp"
+#ifdef USE_WIFI_PENDANT
+#include "net/net_config.h"
+#endif
 
 LGFX_Device&       display = M5Dial.Display;
 LGFX_Sprite        canvas(&M5Dial.Display);
@@ -127,6 +130,12 @@ void ackBeep() {
 }
 
 bool ui_locked() {
+#ifdef USE_WIFI_PENDANT
+    // For WiFi pendant mode, check WiFi connection status
+    if (!NetConfig::isWifiConnected()) {
+        return true; // Lock UI when WiFi is not connected
+    }
+#endif
     return false;
 }
 
