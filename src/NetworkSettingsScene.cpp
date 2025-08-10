@@ -58,10 +58,11 @@ void NetworkSettingsScene::saveNetworkSettings() {
     
     if (success) {
         showTestResult(true, "Settings saved!");
-        // TODO: Trigger reconnection if needed
+        // Trigger reconnection if WiFi is currently active
         if (wifiReady()) {
-            // Disconnect and reconnect with new settings
+            // Disconnect and attempt to reconnect with new settings
             NetConfig::disconnectWifi();
+            delay_ms(1000); // Brief delay before reconnect attempt
             wifiConnectAsync();
         }
     } else {
@@ -156,7 +157,17 @@ void NetworkSettingsScene::onEncoder(int delta) {
             moveKeyboardCursor(0, -1); // Move left
         }
     } else if (_editing) {
-        moveCursor(delta);
+        // Special handling for transport field - cycle through options
+        if (_current_field == FIELD_TRANSPORT) {
+            if (delta > 0) {
+                _edit_buffer = (_edit_buffer == "ws") ? "tcp" : "ws";
+            } else {
+                _edit_buffer = (_edit_buffer == "tcp") ? "ws" : "tcp";
+            }
+            reDisplay();
+        } else {
+            moveCursor(delta);
+        }
     } else {
         // Move between fields
         _current_field += delta;
@@ -203,20 +214,38 @@ void NetworkSettingsScene::commitEdit() {
     // Apply edit buffer to current field
     switch (_current_field) {
         case FIELD_SSID:
-            strlcpy(_ssid, _edit_buffer.c_str(), sizeof(_ssid));
+            if (_edit_buffer.length() > 0) {
+                strlcpy(_ssid, _edit_buffer.c_str(), sizeof(_ssid));
+            }
             break;
         case FIELD_PASSWORD:
+            // Allow empty passwords for open networks
             strlcpy(_password, _edit_buffer.c_str(), sizeof(_password));
             break;
         case FIELD_HOST:
-            strlcpy(_host, _edit_buffer.c_str(), sizeof(_host));
+            if (_edit_buffer.length() > 0) {
+                strlcpy(_host, _edit_buffer.c_str(), sizeof(_host));
+            }
             break;
         case FIELD_PORT:
-            _port = atoi(_edit_buffer.c_str());
-            if (_port <= 0) _port = 81; // Default port
+            {
+                int port = atoi(_edit_buffer.c_str());
+                if (port > 0 && port <= 65535) {
+                    _port = port;
+                } else {
+                    _port = 81; // Default port if invalid
+                    showTestResult(false, "Invalid port, using 81");
+                }
+            }
             break;
         case FIELD_TRANSPORT:
-            strlcpy(_transport, _edit_buffer.c_str(), sizeof(_transport));
+            // Validate transport type
+            if (_edit_buffer == "ws" || _edit_buffer == "tcp") {
+                strlcpy(_transport, _edit_buffer.c_str(), sizeof(_transport));
+            } else {
+                strlcpy(_transport, "ws", sizeof(_transport)); // Default to websocket
+                showTestResult(false, "Invalid transport, using ws");
+            }
             break;
     }
     
