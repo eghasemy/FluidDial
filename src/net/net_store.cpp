@@ -6,54 +6,153 @@
 #ifdef USE_WIFI_PENDANT
 
 #include "System.h"
+#include <ArduinoJson.h>
 
-// Network storage implementation (stub)
-// Future implementation will use ESP32 NVS or similar for persistent storage
+// Network storage implementation using LittleFS-backed JSON file
+const char* NET_CONFIG_FILE = "/net.json";
 
 bool NetStore::init() {
-    // Stub implementation
-    // Future: Initialize NVS partition for network settings
+    // LittleFS is already initialized in SystemArduino.cpp
     return true;
 }
 
 bool NetStore::saveWifiCredentials(const char* ssid, const char* password) {
-    // Stub implementation
-    // Future: Store WiFi credentials in NVS
-    (void)ssid;
-    (void)password;
-    return true;
+    // Load existing settings
+    char host[64] = "fluidnc.local";
+    int port = 81;
+    char transport[16] = "ws";
+    
+    // Try to load existing host/port/transport settings
+    DynamicJsonDocument doc(512);
+    File file = LittleFS.open(NET_CONFIG_FILE, "r");
+    if (file) {
+        if (deserializeJson(doc, file) == DeserializationError::Ok) {
+            strlcpy(host, doc["host"] | "fluidnc.local", sizeof(host));
+            port = doc["port"] | 81;
+            strlcpy(transport, doc["transport"] | "ws", sizeof(transport));
+        }
+        file.close();
+    }
+    
+    return netSave(ssid, password, host, port, transport);
 }
 
 bool NetStore::loadWifiCredentials(char* ssid, size_t ssidLen, char* password, size_t passwordLen) {
-    // Stub implementation  
-    // Future: Load WiFi credentials from NVS
-    (void)ssid;
-    (void)ssidLen;
-    (void)password;
-    (void)passwordLen;
-    return false; // No credentials stored yet
+    char host[64];
+    int port;
+    char transport[16];
+    
+    return netLoad(ssid, ssidLen, password, passwordLen, host, sizeof(host), port, transport, sizeof(transport));
 }
 
 bool NetStore::saveFluidNCHost(const char* host, int port) {
-    // Stub implementation
-    // Future: Store FluidNC host/port in NVS
-    (void)host;
-    (void)port;
-    return true;
+    // Load existing WiFi credentials
+    char ssid[64] = "";
+    char password[64] = "";
+    char transport[16] = "ws";
+    
+    // Try to load existing WiFi/transport settings
+    DynamicJsonDocument doc(512);
+    File file = LittleFS.open(NET_CONFIG_FILE, "r");
+    if (file) {
+        if (deserializeJson(doc, file) == DeserializationError::Ok) {
+            strlcpy(ssid, doc["ssid"] | "", sizeof(ssid));
+            strlcpy(password, doc["pass"] | "", sizeof(password));
+            strlcpy(transport, doc["transport"] | "ws", sizeof(transport));
+        }
+        file.close();
+    }
+    
+    return netSave(ssid, password, host, port, transport);
 }
 
 bool NetStore::loadFluidNCHost(char* host, size_t hostLen, int& port) {
-    // Stub implementation
-    // Future: Load FluidNC host/port from NVS
-    (void)host;
-    (void)hostLen;
-    (void)port;
-    return false; // No host configured yet
+    char ssid[64];
+    char password[64];
+    char transport[16];
+    
+    if (netLoad(ssid, sizeof(ssid), password, sizeof(password), host, hostLen, port, transport, sizeof(transport))) {
+        return true;
+    }
+    
+    // Return defaults if no config found
+    strlcpy(host, "fluidnc.local", hostLen);
+    port = 81;
+    return false;
 }
 
 void NetStore::clear() {
-    // Stub implementation
-    // Future: Clear all network settings from NVS
+    // Remove the network configuration file
+    if (LittleFS.exists(NET_CONFIG_FILE)) {
+        LittleFS.remove(NET_CONFIG_FILE);
+    }
+}
+
+// Core JSON-based network settings storage functions
+bool NetStore::netSave(const char* ssid, const char* password, const char* host, int port, const char* transport) {
+    DynamicJsonDocument doc(512);
+    
+    // Set values, using defaults where appropriate
+    doc["ssid"] = ssid ? ssid : "";
+    doc["pass"] = password ? password : "";
+    doc["host"] = host ? host : "fluidnc.local";
+    doc["port"] = port > 0 ? port : 81;
+    doc["transport"] = transport ? transport : "ws";
+    
+    File file = LittleFS.open(NET_CONFIG_FILE, "w");
+    if (!file) {
+        return false;
+    }
+    
+    bool success = (serializeJson(doc, file) > 0);
+    file.close();
+    
+    return success;
+}
+
+bool NetStore::netLoad(char* ssid, size_t ssidLen, char* password, size_t passwordLen, 
+                      char* host, size_t hostLen, int& port, char* transport, size_t transportLen) {
+    // Set defaults first
+    if (ssid && ssidLen > 0) ssid[0] = '\0';
+    if (password && passwordLen > 0) password[0] = '\0';
+    if (host && hostLen > 0) strlcpy(host, "fluidnc.local", hostLen);
+    port = 81;
+    if (transport && transportLen > 0) strlcpy(transport, "ws", transportLen);
+    
+    // Try to load from file
+    if (!LittleFS.exists(NET_CONFIG_FILE)) {
+        return false; // Missing file → defaults apply (as per requirements)
+    }
+    
+    File file = LittleFS.open(NET_CONFIG_FILE, "r");
+    if (!file) {
+        return false;
+    }
+    
+    DynamicJsonDocument doc(512);
+    DeserializationError error = deserializeJson(doc, file);
+    file.close();
+    
+    if (error) {
+        return false; // Parse error → defaults apply
+    }
+    
+    // Load values from JSON, keeping defaults for missing keys
+    if (ssid && ssidLen > 0) {
+        strlcpy(ssid, doc["ssid"] | "", ssidLen);
+    }
+    if (password && passwordLen > 0) {
+        strlcpy(password, doc["pass"] | "", passwordLen);
+    }
+    if (host && hostLen > 0) {
+        strlcpy(host, doc["host"] | "fluidnc.local", hostLen);
+    }
+    port = doc["port"] | 81;
+    if (transport && transportLen > 0) {
+        strlcpy(transport, doc["transport"] | "ws", transportLen);
+    }
+    
+    return true;
 }
 
 #endif // USE_WIFI_PENDANT

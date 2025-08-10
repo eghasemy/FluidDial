@@ -16,6 +16,11 @@ public:
     static bool saveFluidNCHost(const char* host, int port);
     static bool loadFluidNCHost(char* host, size_t hostLen, int& port);
     static void clear();
+    
+    // New functions for comprehensive network settings
+    static bool netSave(const char* ssid, const char* password, const char* host, int port, const char* transport);
+    static bool netLoad(char* ssid, size_t ssidLen, char* password, size_t passwordLen, 
+                       char* host, size_t hostLen, int& port, char* transport, size_t transportLen);
 };
 
 #endif // USE_WIFI_PENDANT
