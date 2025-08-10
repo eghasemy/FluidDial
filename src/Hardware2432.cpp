@@ -561,13 +561,9 @@ bool ui_locked() {
         redrawButtons();
     }
     
-#ifdef USE_WIFI_PENDANT
-    // For WiFi pendant mode, also check WiFi connection status
-    if (!NetConfig::isWifiConnected()) {
-        return true; // Lock UI when WiFi is not connected
-    }
-#endif
-    
+    // Allow UI access for configuration even when WiFi is not connected
+    // The application logic handles what features are available when disconnected
+    // Only respect the hardware lockout pin
     return locked;
 }
 
