@@ -10,17 +10,19 @@ class PieMenu : public Menu {
 private:
     int _item_radius;
     int _num_slopes;
+    bool _positions_calculated;
 
     std::vector<int> _slopes;  // Slopes of lines dividing switch positions
 
 public:
-    PieMenu(const char* name, int item_radius, const char** help_text = nullptr) : Menu(name, help_text), _item_radius(item_radius) {}
+    PieMenu(const char* name, int item_radius, const char** help_text = nullptr) : Menu(name, help_text), _item_radius(item_radius), _positions_calculated(false) {}
     PieMenu(const char* name, int item_radius, int num_items, const char** help_text = nullptr) :
-        Menu(name, num_items, help_text), _item_radius(item_radius) {
-        calculatePositions();
+        Menu(name, num_items, help_text), _item_radius(item_radius), _positions_calculated(false) {
+        // Don't call calculatePositions() here - defer until display is ready
     }
     void menuBackground() override;
     void calculatePositions();
+    void ensurePositionsCalculated();  // Lazy initialization helper
     void onEncoder(int delta) override { Menu::onEncoder(delta); }
     void onTouchHold() override;
     void onTouchClick() override;
@@ -28,7 +30,7 @@ public:
     void onDialButtonPress() override;
     void addItem(Item* item) {
         Menu::addItem(item);
-        calculatePositions();
+        _positions_calculated = false; // Mark positions as needing recalculation
     }
     int  touchedItem(int x, int y) override;
     void onStateChange(state_t old_state) override;

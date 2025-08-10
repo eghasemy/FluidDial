@@ -6,6 +6,17 @@
 #include "Drawing.h"
 #include "polar.h"
 
+void PieMenu::ensurePositionsCalculated() {
+    if (!_positions_calculated && num_items() > 0) {
+        // Check if display is initialized by testing if width and height are valid
+        // The display dimensions should be reasonable (> 0) when properly initialized
+        if (display.width() > 0 && display.height() > 0) {
+            calculatePositions();
+            _positions_calculated = true;
+        }
+    }
+}
+
 void PieMenu::calculatePositions() {
     _num_slopes = num_items() / 2;  // Rounded down
 
@@ -31,6 +42,8 @@ void PieMenu::calculatePositions() {
 }
 
 int PieMenu::touchedItem(int x, int y) {
+    ensurePositionsCalculated(); // Ensure positions are calculated before use
+    
     // Convert from screen coordinates to 0,0 in the center
     Point ctr = Point { x, y }.from_display();
 
@@ -69,6 +82,7 @@ int PieMenu::touchedItem(int x, int y) {
     return x > 0 ? i : num_items() - i;
 }
 void PieMenu::menuBackground() {
+    ensurePositionsCalculated(); // Ensure positions are calculated before rendering
     background();
     text(selectedItem()->name(), { 0, -15 }, WHITE, SMALL);
     drawStatusSmall(90);
