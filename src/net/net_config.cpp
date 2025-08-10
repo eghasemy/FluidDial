@@ -8,6 +8,7 @@
 #include "System.h"
 #include "net_store.h"
 #include <WiFi.h>
+#include <WiFiClient.h>
 #include <LittleFS.h>
 
 // WiFi connection state management
@@ -181,11 +182,25 @@ bool NetConfig::discoverFluidNCHost(char* host, size_t hostLen, int& port) {
 }
 
 bool NetConfig::testFluidNCConnection(const char* host, int port) {
-    // Stub implementation for now
-    // Future: Test TCP connection to FluidNC host
-    (void)host;
-    (void)port;
-    return isWifiConnected(); // Simple check for now
+    if (!isWifiConnected()) {
+        return false;
+    }
+    
+    // Test actual TCP connection to FluidNC host
+    WiFiClient client;
+    client.setTimeout(5000); // 5 second timeout
+    
+    dbg_printf("Testing FluidNC connection to %s:%d\n", host, port);
+    
+    bool connected = client.connect(host, port);
+    if (connected) {
+        dbg_printf("FluidNC connection test successful\n");
+        client.stop();
+        return true;
+    } else {
+        dbg_printf("FluidNC connection test failed\n");
+        return false;
+    }
 }
 
 const char* NetConfig::getWifiStatus() {

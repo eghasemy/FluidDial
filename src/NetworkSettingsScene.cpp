@@ -8,6 +8,7 @@
 #    include "System.h"
 #    include "net/net_store.h"
 #    include "net/net_config.h"
+#    include "transport/transport_config.h"
 #    include "Text.h"
 #    include "Drawing.h"
 
@@ -62,16 +63,29 @@ void NetworkSettingsScene::saveNetworkSettings() {
     bool success = NetStore::netSave(_ssid, _password, _host, _port, _transport);
 
     if (success) {
+        // Also update transport configuration so the transport layer gets the new settings
+        TransportConfig::setHost(_host);
+        TransportConfig::setPort(_port);
+        TransportConfig::setTransportType(
+            (strcmp(_transport, "tcp") == 0) ? TransportConfig::TELNET : TransportConfig::WEBSOCKET
+        );
+        // Save transport config to persistent storage
+        TransportConfig::saveConfig();
+        
         showTestResult(true, "Settings saved!");
         // Reload settings to ensure UI reflects what was actually saved
         loadNetworkSettings();
         reDisplay();
-        // Trigger reconnection if WiFi is currently active
+        
+        // Force transport reconnection with new settings
         if (wifiReady()) {
-            // Disconnect and attempt to reconnect with new settings
+            // Disconnect WiFi and force transport to reconnect
             NetConfig::disconnectWifi();
             delay_ms(1000);  // Brief delay before reconnect attempt
             wifiConnectAsync();
+            // Force transport re-selection after WiFi reconnects
+            delay_ms(2000);  // Give WiFi time to reconnect
+            selectTransport(); // This will create new transport with updated config
         }
     } else {
         showTestResult(false, "Save failed!");
@@ -91,10 +105,13 @@ bool NetworkSettingsScene::testNetworkConnection() {
         return false;
     }
 
-    // Test FluidNC connection
+    // Wait for WiFi to establish connection
+    delay_ms(2000);
+    
+    // Test actual FluidNC connection 
     bool host_success = NetConfig::testFluidNCConnection(_host, _port);
     if (!host_success) {
-        showTestResult(false, "Host failed");
+        showTestResult(false, "FluidNC failed");
         return false;
     }
 
