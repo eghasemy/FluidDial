@@ -1,68 +1,56 @@
-// Copyright (c) 2023 - Barton Dring  
+// Copyright (c) 2023 - Barton Dring
 // Use of this source code is governed by a GPLv3 license that can be found in the LICENSE file.
 
 #include "NetworkSettingsScene.h"
 
 #ifdef USE_WIFI_PENDANT
 
-#include "System.h"
-#include "net/net_store.h"
-#include "net/net_config.h"
-#include "Text.h"
-#include "Drawing.h"
+#    include "System.h"
+#    include "net/net_store.h"
+#    include "net/net_config.h"
+#    include "Text.h"
+#    include "Drawing.h"
 
 // Soft keyboard layout - using string literals instead of multi-char constants
-const char* NetworkSettingsScene::keyboard_layout[4][10] = {
-    {"q", "w", "e", "r", "t", "y", "u", "i", "o", "p"},
-    {"a", "s", "d", "f", "g", "h", "j", "k", "l", "ENT"},
-    {"z", "x", "c", "v", "b", "n", "m", ".", "DEL", ""},
-    {"123", " ", "ABC", "←", "→", "SAVE", "TEST", "EXIT", "", ""}
-};
+const char* NetworkSettingsScene::keyboard_layout[4][10] = { { "q", "w", "e", "r", "t", "y", "u", "i", "o", "p" },
+                                                             { "a", "s", "d", "f", "g", "h", "j", "k", "l", "ENT" },
+                                                             { "z", "x", "c", "v", "b", "n", "m", ".", "DEL", "" },
+                                                             { "123", " ", "ABC", "←", "→", "SAVE", "TEST", "EXIT", "", "" } };
 
-static const char* field_names[] = {
-    "SSID:",
-    "Password:",
-    "Host/IP:",
-    "Port:",
-    "Transport:"
-};
+static const char* field_names[] = { "SSID:", "Password:", "Host/IP:", "Port:", "Transport:" };
 
-static const char* transport_options[] = {
-    "ws",
-    "tcp"
-};
+static const char* transport_options[] = { "ws", "tcp" };
 
 void NetworkSettingsScene::onEntry(void* arg) {
     loadNetworkSettings();
-    _current_field = 0;
-    _editing = false;
+    _current_field   = 0;
+    _editing         = false;
     _keyboard_active = false;
-    _cursor_pos = 0;
+    _cursor_pos      = 0;
     reDisplay();
 }
 
 void NetworkSettingsScene::onExit() {
-    _editing = false;
+    _editing         = false;
     _keyboard_active = false;
 }
 
 void NetworkSettingsScene::loadNetworkSettings() {
     // Load current network settings from storage
-    NetStore::netLoad(_ssid, sizeof(_ssid), _password, sizeof(_password),
-                     _host, sizeof(_host), _port, _transport, sizeof(_transport));
+    NetStore::netLoad(_ssid, sizeof(_ssid), _password, sizeof(_password), _host, sizeof(_host), _port, _transport, sizeof(_transport));
 }
 
 void NetworkSettingsScene::saveNetworkSettings() {
     // Save current settings to /net.json
     bool success = NetStore::netSave(_ssid, _password, _host, _port, _transport);
-    
+
     if (success) {
         showTestResult(true, "Settings saved!");
         // Trigger reconnection if WiFi is currently active
         if (wifiReady()) {
             // Disconnect and attempt to reconnect with new settings
             NetConfig::disconnectWifi();
-            delay_ms(1000); // Brief delay before reconnect attempt
+            delay_ms(1000);  // Brief delay before reconnect attempt
             wifiConnectAsync();
         }
     } else {
@@ -75,21 +63,21 @@ bool NetworkSettingsScene::testNetworkConnection() {
     showTestResult(false, "Testing...");
     refreshDisplay();
     delay_ms(500);
-    
+
     // Try to connect with current settings
     bool wifi_success = NetConfig::connectWifi(_ssid, _password);
     if (!wifi_success) {
         showTestResult(false, "WiFi failed");
         return false;
     }
-    
+
     // Test FluidNC connection
     bool host_success = NetConfig::testFluidNCConnection(_host, _port);
     if (!host_success) {
         showTestResult(false, "Host failed");
         return false;
     }
-    
+
     showTestResult(true, "Connection OK!");
     return true;
 }
@@ -97,7 +85,7 @@ bool NetworkSettingsScene::testNetworkConnection() {
 void NetworkSettingsScene::onDialButtonPress() {
     if (_keyboard_active) {
         // Select keyboard key
-        char c = getCurrentKeyboardChar();
+        char        c   = getCurrentKeyboardChar();
         const char* key = keyboard_layout[_keyboard_row][_keyboard_col];
         if (strcmp(key, "ENT") == 0) {
             commitEdit();
@@ -158,16 +146,18 @@ void NetworkSettingsScene::onEncoder(int delta) {
         } else {
             current_pos--;
         }
-        
+
         // Find next valid key position
-        int total_keys = 40; // 4 rows * 10 cols
+        int total_keys = 40;  // 4 rows * 10 cols
         for (int i = 0; i < total_keys; i++) {
-            if (current_pos >= total_keys) current_pos = 0;
-            if (current_pos < 0) current_pos = total_keys - 1;
-            
+            if (current_pos >= total_keys)
+                current_pos = 0;
+            if (current_pos < 0)
+                current_pos = total_keys - 1;
+
             int new_row = current_pos / 10;
             int new_col = current_pos % 10;
-            
+
             // Check if this position has a valid key
             if (strlen(keyboard_layout[new_row][new_col]) > 0) {
                 _keyboard_row = new_row;
@@ -175,7 +165,7 @@ void NetworkSettingsScene::onEncoder(int delta) {
                 reDisplay();
                 return;
             }
-            
+
             // Move to next position and continue searching
             if (delta > 0) {
                 current_pos++;
@@ -199,16 +189,18 @@ void NetworkSettingsScene::onEncoder(int delta) {
         // Move between fields - normalize delta to prevent jumping multiple fields
         int step = (delta > 0) ? 1 : -1;
         _current_field += step;
-        if (_current_field >= FIELD_COUNT) _current_field = 0;
-        if (_current_field < 0) _current_field = FIELD_COUNT - 1;
+        if (_current_field >= FIELD_COUNT)
+            _current_field = 0;
+        if (_current_field < 0)
+            _current_field = FIELD_COUNT - 1;
         reDisplay();
     }
 }
 
 void NetworkSettingsScene::startEditing() {
-    _editing = true;
+    _editing         = true;
     _keyboard_active = true;
-    
+
     // Set edit buffer to current field value
     switch (_current_field) {
         case FIELD_SSID:
@@ -227,13 +219,13 @@ void NetworkSettingsScene::startEditing() {
             _edit_buffer = _transport;
             break;
     }
-    
+
     _cursor_pos = _edit_buffer.length();
     reDisplay();
 }
 
 void NetworkSettingsScene::stopEditing() {
-    _editing = false;
+    _editing         = false;
     _keyboard_active = false;
     reDisplay();
 }
@@ -255,28 +247,26 @@ void NetworkSettingsScene::commitEdit() {
                 strlcpy(_host, _edit_buffer.c_str(), sizeof(_host));
             }
             break;
-        case FIELD_PORT:
-            {
-                int port = atoi(_edit_buffer.c_str());
-                if (port > 0 && port <= 65535) {
-                    _port = port;
-                } else {
-                    _port = 81; // Default port if invalid
-                    showTestResult(false, "Invalid port, using 81");
-                }
+        case FIELD_PORT: {
+            int port = atoi(_edit_buffer.c_str());
+            if (port > 0 && port <= 65535) {
+                _port = port;
+            } else {
+                _port = 81;  // Default port if invalid
+                showTestResult(false, "Invalid port, using 81");
             }
-            break;
+        } break;
         case FIELD_TRANSPORT:
             // Validate transport type
             if (_edit_buffer == "ws" || _edit_buffer == "tcp") {
                 strlcpy(_transport, _edit_buffer.c_str(), sizeof(_transport));
             } else {
-                strlcpy(_transport, "ws", sizeof(_transport)); // Default to websocket
+                strlcpy(_transport, "ws", sizeof(_transport));  // Default to websocket
                 showTestResult(false, "Invalid transport, using ws");
             }
             break;
     }
-    
+
     stopEditing();
 }
 
@@ -287,13 +277,15 @@ void NetworkSettingsScene::cancelEdit() {
 
 void NetworkSettingsScene::moveCursor(int delta) {
     _cursor_pos += delta;
-    if (_cursor_pos < 0) _cursor_pos = 0;
-    if (_cursor_pos > (int)_edit_buffer.length()) _cursor_pos = _edit_buffer.length();
+    if (_cursor_pos < 0)
+        _cursor_pos = 0;
+    if (_cursor_pos > (int)_edit_buffer.length())
+        _cursor_pos = _edit_buffer.length();
     reDisplay();
 }
 
 void NetworkSettingsScene::insertChar(char c) {
-    if (_edit_buffer.length() < 63) { // Leave room for null terminator
+    if (_edit_buffer.length() < 63) {  // Leave room for null terminator
         _edit_buffer.insert(_cursor_pos, 1, c);
         _cursor_pos++;
         reDisplay();
@@ -311,18 +303,22 @@ void NetworkSettingsScene::deleteChar() {
 void NetworkSettingsScene::moveKeyboardCursor(int row_delta, int col_delta) {
     _keyboard_row += row_delta;
     _keyboard_col += col_delta;
-    
+
     // Wrap around
-    if (_keyboard_row < 0) _keyboard_row = 3;
-    if (_keyboard_row > 3) _keyboard_row = 0;
-    if (_keyboard_col < 0) _keyboard_col = 9;
-    if (_keyboard_col > 9) _keyboard_col = 0;
-    
+    if (_keyboard_row < 0)
+        _keyboard_row = 3;
+    if (_keyboard_row > 3)
+        _keyboard_row = 0;
+    if (_keyboard_col < 0)
+        _keyboard_col = 9;
+    if (_keyboard_col > 9)
+        _keyboard_col = 0;
+
     // Skip empty cells
     if (strlen(keyboard_layout[_keyboard_row][_keyboard_col]) == 0) {
         moveKeyboardCursor(row_delta, col_delta);
     }
-    
+
     reDisplay();
 }
 
@@ -337,20 +333,20 @@ char NetworkSettingsScene::getCurrentKeyboardChar() {
     } else if (strcmp(key, " ") == 0) {
         return ' ';
     }
-    return 0; // Special keys
+    return 0;  // Special keys
 }
 
 void NetworkSettingsScene::drawField(int field_index, int y) {
     bool is_current = (field_index == _current_field);
     bool is_editing = is_current && _editing;
-    
+
     // Field name
     text(field_names[field_index], 10, y, is_current ? GREEN : WHITE, SMALL, middle_left);
-    
+
     // Field value
     std::string value;
-    bool is_password = (field_index == FIELD_PASSWORD);
-    
+    bool        is_password = (field_index == FIELD_PASSWORD);
+
     if (is_editing) {
         value = _edit_buffer;
         if (is_password && _password_masked) {
@@ -379,57 +375,59 @@ void NetworkSettingsScene::drawField(int field_index, int y) {
                 break;
         }
     }
-    
+
     // Draw field value with background
-    int bg_color = is_editing ? BLUE : (is_current ? DARKGREY : BLACK);
+    int bg_color   = is_editing ? BLUE : (is_current ? DARKGREY : BLACK);
     int text_color = is_editing ? WHITE : (is_current ? YELLOW : LIGHTGREY);
-    
+
     canvas.fillRoundRect(75, y - 8, 155, 16, 2, bg_color);
     text(value.c_str(), 80, y, text_color, SMALL, middle_left);
 }
 
 void NetworkSettingsScene::drawSoftKeyboard() {
-    if (!_keyboard_active) return;
-    
-    const int kb_start_y = 140;
-    const int key_width = 22;
-    const int key_height = 18;
+    if (!_keyboard_active)
+        return;
+
+    const int kb_start_y  = 140;
+    const int key_width   = 22;
+    const int key_height  = 18;
     const int key_spacing = 2;
-    
+
     for (int row = 0; row < 4; row++) {
         for (int col = 0; col < 10; col++) {
             const char* key = keyboard_layout[row][col];
-            if (strlen(key) == 0) continue;
-            
+            if (strlen(key) == 0)
+                continue;
+
             int x = 5 + col * (key_width + key_spacing);
             int y = kb_start_y + row * (key_height + key_spacing);
-            
+
             bool is_selected = (row == _keyboard_row && col == _keyboard_col);
-            int bg_color = is_selected ? GREEN : DARKGREY;
-            int text_color = is_selected ? BLACK : WHITE;
-            
+            int  bg_color    = is_selected ? GREEN : DARKGREY;
+            int  text_color  = is_selected ? BLACK : WHITE;
+
             canvas.fillRoundRect(x, y, key_width, key_height, 3, bg_color);
             canvas.drawRoundRect(x, y, key_width, key_height, 3, WHITE);
-            
+
             // Handle special keys
             const char* display_text = key;
             if (strcmp(key, " ") == 0) {
                 display_text = "SPC";
             } else if (strcmp(key, "SAVE") == 0) {
-                bg_color = GREEN;
+                bg_color   = GREEN;
                 text_color = BLACK;
                 canvas.fillRoundRect(x, y, key_width, key_height, 3, bg_color);
             } else if (strcmp(key, "TEST") == 0) {
-                bg_color = ORANGE;
+                bg_color   = ORANGE;
                 text_color = BLACK;
                 canvas.fillRoundRect(x, y, key_width, key_height, 3, bg_color);
             } else if (strcmp(key, "EXIT") == 0) {
-                bg_color = RED;
+                bg_color   = RED;
                 text_color = WHITE;
                 canvas.fillRoundRect(x, y, key_width, key_height, 3, bg_color);
             }
-            
-            text(display_text, x + key_width/2, y + key_height/2, text_color, TINY, middle_center);
+
+            text(display_text, x + key_width / 2, y + key_height / 2, text_color, TINY, middle_center);
         }
     }
 }
@@ -445,20 +443,20 @@ void NetworkSettingsScene::showTestResult(bool success, const char* message) {
 void NetworkSettingsScene::reDisplay() {
     background();
     drawStatus();
-    
+
     // Title
     centered_text("Network Settings", 30, WHITE, MEDIUM);
-    
+
     // Draw input fields
     int field_y = 60;
     for (int i = 0; i < FIELD_COUNT; i++) {
         drawField(i, field_y);
         field_y += 20;
     }
-    
+
     // Draw soft keyboard if active
     drawSoftKeyboard();
-    
+
     // Draw button legends
     if (_keyboard_active) {
         drawButtonLegends("Cancel", "Done", "Select");
@@ -467,7 +465,7 @@ void NetworkSettingsScene::reDisplay() {
     } else {
         drawButtonLegends("Test", "Save", "Back");
     }
-    
+
     refreshDisplay();
 }
 
@@ -477,4 +475,4 @@ void NetworkSettingsScene::onStateChange(state_t old_state) {
 
 NetworkSettingsScene networkSettingsScene;
 
-#endif // USE_WIFI_PENDANT
+#endif  // USE_WIFI_PENDANT
