@@ -6,6 +6,9 @@
 #include "Scene.h"
 #include "AboutScene.h"
 #include "transport/transport.h"
+#ifdef USE_WIFI_PENDANT
+#include "net/net_config.h"
+#endif
 
 extern void base_display();
 extern void show_logo();
@@ -26,6 +29,17 @@ void setup() {
 
     dbg_printf("FluidNC Pendant %s\n", git_info);
 
+#ifdef USE_WIFI_PENDANT
+    // Initialize WiFi connection manager
+    if (wifiInit()) {
+        dbg_printf("WiFi: Connection manager initialized\n");
+        // Start async connection if credentials are available
+        wifiConnectAsync();
+    } else {
+        dbg_printf("WiFi: Failed to initialize connection manager\n");
+    }
+#endif
+
     if (transport) {
         transport->sendRT(StatusReport);  // Kick FluidNC into action using transport
     } else {
@@ -39,6 +53,11 @@ void setup() {
 }
 
 void loop() {
+#ifdef USE_WIFI_PENDANT
+    // Update WiFi connection status and handle reconnects
+    wifiReady();
+#endif
+    
     if (transport) {
         transport->loop();  // Handle transport-specific tasks
     }

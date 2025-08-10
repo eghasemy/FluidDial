@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <cstddef> // For size_t
+
 #ifdef USE_WIFI_PENDANT
 
 // Network storage interface for WiFi pendant configuration

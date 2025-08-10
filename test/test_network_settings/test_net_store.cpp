@@ -4,6 +4,7 @@
 
 #include "net/net_store.h"
 #include <LittleFS.h>
+#include <Arduino.h>
 
 void setUp(void) {
     // Initialize LittleFS
@@ -167,6 +168,8 @@ void loop() {
 }
 
 #else
+
+#include <Arduino.h>
 
 // Stub test when WiFi pendant is not enabled
 void setup() {

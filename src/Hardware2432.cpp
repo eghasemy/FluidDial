@@ -4,6 +4,9 @@
 // System interface routines for the Arduino framework
 
 #include "System.h"
+#ifdef USE_WIFI_PENDANT
+#include "net/net_config.h"
+#endif
 
 #define LGFX_USE_V1
 #include <LovyanGFX.hpp>
@@ -557,7 +560,16 @@ bool ui_locked() {
         last_locked = locked;
         redrawButtons();
     }
+    
+#ifdef USE_WIFI_PENDANT
+    // For WiFi pendant mode, also check WiFi connection status
+    if (!NetConfig::isWifiConnected()) {
+        return true; // Lock UI when WiFi is not connected
+    }
+#endif
+    
     return locked;
+}
 }
 
 bool in_rect(Point test, Point xy, Point wh) {

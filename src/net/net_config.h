@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <cstddef> // For size_t
+
 #ifdef USE_WIFI_PENDANT
 
 // Network configuration interface for WiFi pendant
@@ -10,7 +12,12 @@
 
 class NetConfig {
 public:
-    static bool init();
+    // Core WiFi Management Functions (as required by issue)
+    static bool init(); // wifiInit() - mounts FS and loads config
+    static bool wifiConnectAsync(); // attempt join, non-blocking
+    static bool wifiReady(); // track WL_CONNECTED state with reconnect backoff
+    
+    // Additional helper functions
     static bool connectWifi(const char* ssid, const char* password);
     static bool isWifiConnected();
     static void disconnectWifi();
@@ -19,5 +26,10 @@ public:
     static const char* getWifiStatus();
     static const char* getLocalIP();
 };
+
+// Alias functions to match issue requirements exactly
+#define wifiInit() NetConfig::init()
+#define wifiConnectAsync() NetConfig::wifiConnectAsync()
+#define wifiReady() NetConfig::wifiReady()
 
 #endif // USE_WIFI_PENDANT
