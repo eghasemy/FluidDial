@@ -54,6 +54,11 @@ Scene& jogScene = multiJogScene;
 extern Scene controlScene;
 extern Scene aboutScene;
 
+#ifdef USE_WIFI_PENDANT
+#include "SettingsScene.h"
+#include "NetworkSettingsScene.h"
+#endif
+
 IB statusButton("Status", &statusScene, "statustp.png");
 IB homingButton("Homing", &homingScene, "hometp.png");
 IB jogButton("Jog", &jogScene, "jogtp.png");
@@ -67,7 +72,11 @@ IB filesButton("Files", &fileSelectScene, "filestp.png");
 #endif
 
 IB controlButton("Macros", &macroMenu, "macrostp.png");
+#ifdef USE_WIFI_PENDANT
+IB setupButton("Settings", &settingsScene, "abouttp.png");
+#else
 IB setupButton("About", &aboutScene, "abouttp.png");
+#endif
 
 class MenuScene : public PieMenu {
 public:
