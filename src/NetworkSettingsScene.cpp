@@ -11,11 +11,27 @@
 #    include "Text.h"
 #    include "Drawing.h"
 
-// Soft keyboard layout - using string literals instead of multi-char constants
-const char* NetworkSettingsScene::keyboard_layout[4][10] = { { "q", "w", "e", "r", "t", "y", "u", "i", "o", "p" },
-                                                             { "a", "s", "d", "f", "g", "h", "j", "k", "l", "ENT" },
-                                                             { "z", "x", "c", "v", "b", "n", "m", ".", "DEL", "" },
-                                                             { "123", " ", "ABC", "←", "→", "SAVE", "TEST", "EXIT", "", "" } };
+// Soft keyboard layouts
+const char* NetworkSettingsScene::keyboard_layout_lower[4][10] = { 
+    { "q", "w", "e", "r", "t", "y", "u", "i", "o", "p" },
+    { "a", "s", "d", "f", "g", "h", "j", "k", "l", "ENT" },
+    { "z", "x", "c", "v", "b", "n", "m", ".", "DEL", "" },
+    { "123", " ", "SHIFT", "←", "→", "SAVE", "TEST", "EXIT", "", "" } 
+};
+
+const char* NetworkSettingsScene::keyboard_layout_upper[4][10] = { 
+    { "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P" },
+    { "A", "S", "D", "F", "G", "H", "J", "K", "L", "ENT" },
+    { "Z", "X", "C", "V", "B", "N", "M", ".", "DEL", "" },
+    { "123", " ", "shift", "←", "→", "SAVE", "TEST", "EXIT", "", "" } 
+};
+
+const char* NetworkSettingsScene::keyboard_layout_numbers[4][10] = { 
+    { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0" },
+    { "@", "#", "$", "%", "&", "*", "(", ")", "-", "ENT" },
+    { "!", "?", ":", ";", "_", "+", "=", "/", "DEL", "" },
+    { "ABC", " ", "\\", "←", "→", "SAVE", "TEST", "EXIT", "", "" } 
+};
 
 static const char* field_names[] = { "SSID:", "Password:", "Host/IP:", "Port:", "Transport:" };
 
@@ -26,6 +42,7 @@ void NetworkSettingsScene::onEntry(void* arg) {
     _current_field   = 0;
     _editing         = false;
     _keyboard_active = false;
+    _keyboard_mode   = KEYBOARD_LOWERCASE;
     _cursor_pos      = 0;
     reDisplay();
 }
@@ -86,7 +103,9 @@ void NetworkSettingsScene::onDialButtonPress() {
     if (_keyboard_active) {
         // Select keyboard key
         char        c   = getCurrentKeyboardChar();
-        const char* key = keyboard_layout[_keyboard_row][_keyboard_col];
+        const char* const* layout = getCurrentKeyboardLayout();
+        const char* key = layout[_keyboard_row * 10 + _keyboard_col];
+        
         if (strcmp(key, "ENT") == 0) {
             commitEdit();
         } else if (strcmp(key, "DEL") == 0) {
@@ -97,6 +116,14 @@ void NetworkSettingsScene::onDialButtonPress() {
             testNetworkConnection();
         } else if (strcmp(key, "EXIT") == 0) {
             cancelEdit();
+        } else if (strcmp(key, "123") == 0) {
+            switchKeyboardMode(KEYBOARD_NUMBERS);
+        } else if (strcmp(key, "ABC") == 0) {
+            switchKeyboardMode(KEYBOARD_LOWERCASE);
+        } else if (strcmp(key, "SHIFT") == 0) {
+            switchKeyboardMode(KEYBOARD_UPPERCASE);
+        } else if (strcmp(key, "shift") == 0) {
+            switchKeyboardMode(KEYBOARD_LOWERCASE);
         } else if (c != 0) {
             insertChar(c);
         }
@@ -146,6 +173,7 @@ void NetworkSettingsScene::onEncoder(int delta) {
         current_pos += step;
 
         // Find next valid key position
+        const char* const* layout = getCurrentKeyboardLayout();
         int total_keys = 40;  // 4 rows * 10 cols
         for (int i = 0; i < total_keys; i++) {
             if (current_pos >= total_keys)
@@ -157,7 +185,7 @@ void NetworkSettingsScene::onEncoder(int delta) {
             int new_col = current_pos % 10;
 
             // Check if this position has a valid key
-            if (strlen(keyboard_layout[new_row][new_col]) > 0) {
+            if (strlen(layout[new_row * 10 + new_col]) > 0) {
                 _keyboard_row = new_row;
                 _keyboard_col = new_col;
                 reDisplay();
@@ -311,7 +339,8 @@ void NetworkSettingsScene::moveKeyboardCursor(int row_delta, int col_delta) {
         _keyboard_col = 0;
 
     // Skip empty cells
-    if (strlen(keyboard_layout[_keyboard_row][_keyboard_col]) == 0) {
+    const char* const* layout = getCurrentKeyboardLayout();
+    if (strlen(layout[_keyboard_row * 10 + _keyboard_col]) == 0) {
         moveKeyboardCursor(row_delta, col_delta);
     }
 
@@ -319,7 +348,8 @@ void NetworkSettingsScene::moveKeyboardCursor(int row_delta, int col_delta) {
 }
 
 char NetworkSettingsScene::getCurrentKeyboardChar() {
-    const char* key = keyboard_layout[_keyboard_row][_keyboard_col];
+    const char* const* layout = getCurrentKeyboardLayout();
+    const char* key = layout[_keyboard_row * 10 + _keyboard_col];
     if (strlen(key) == 1) {
         return key[0];
     } else if (strcmp(key, "ENT") == 0) {
@@ -330,6 +360,26 @@ char NetworkSettingsScene::getCurrentKeyboardChar() {
         return ' ';
     }
     return 0;  // Special keys
+}
+
+const char* const* NetworkSettingsScene::getCurrentKeyboardLayout() {
+    switch (_keyboard_mode) {
+        case KEYBOARD_UPPERCASE:
+            return (const char* const*)keyboard_layout_upper;
+        case KEYBOARD_NUMBERS:
+            return (const char* const*)keyboard_layout_numbers;
+        case KEYBOARD_LOWERCASE:
+        default:
+            return (const char* const*)keyboard_layout_lower;
+    }
+}
+
+void NetworkSettingsScene::switchKeyboardMode(KeyboardMode mode) {
+    _keyboard_mode = mode;
+    // Reset keyboard position to a safe location
+    _keyboard_row = 0;
+    _keyboard_col = 0;
+    reDisplay();
 }
 
 void NetworkSettingsScene::drawField(int field_index, int y) {
@@ -389,9 +439,11 @@ void NetworkSettingsScene::drawSoftKeyboard() {
     const int key_height  = 18;
     const int key_spacing = 2;
 
+    const char* const* layout = getCurrentKeyboardLayout();
+
     for (int row = 0; row < 4; row++) {
         for (int col = 0; col < 10; col++) {
-            const char* key = keyboard_layout[row][col];
+            const char* key = layout[row * 10 + col];
             if (strlen(key) == 0)
                 continue;
 
@@ -419,6 +471,14 @@ void NetworkSettingsScene::drawSoftKeyboard() {
                 canvas.fillRoundRect(x, y, key_width, key_height, 3, bg_color);
             } else if (strcmp(key, "EXIT") == 0) {
                 bg_color   = RED;
+                text_color = WHITE;
+                canvas.fillRoundRect(x, y, key_width, key_height, 3, bg_color);
+            } else if (strcmp(key, "123") == 0 || strcmp(key, "ABC") == 0) {
+                bg_color   = BLUE;
+                text_color = WHITE;
+                canvas.fillRoundRect(x, y, key_width, key_height, 3, bg_color);
+            } else if (strcmp(key, "SHIFT") == 0 || strcmp(key, "shift") == 0) {
+                bg_color   = PURPLE;
                 text_color = WHITE;
                 canvas.fillRoundRect(x, y, key_width, key_height, 3, bg_color);
             }

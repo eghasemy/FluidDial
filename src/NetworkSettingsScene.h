@@ -39,12 +39,21 @@ private:
     int _keyboard_row;
     int _keyboard_col;
     
-    static const char* keyboard_layout[4][10];
+    enum KeyboardMode {
+        KEYBOARD_LOWERCASE = 0,
+        KEYBOARD_UPPERCASE,
+        KEYBOARD_NUMBERS
+    };
+    KeyboardMode _keyboard_mode;
+    
+    static const char* keyboard_layout_lower[4][10];
+    static const char* keyboard_layout_upper[4][10];
+    static const char* keyboard_layout_numbers[4][10];
 
 public:
     NetworkSettingsScene() : Scene("Network Settings", 1), _current_field(0), _editing(false), 
                            _password_masked(true), _cursor_pos(0), _keyboard_active(false),
-                           _keyboard_row(0), _keyboard_col(0) {}
+                           _keyboard_row(0), _keyboard_col(0), _keyboard_mode(KEYBOARD_LOWERCASE) {}
 
     void onEntry(void* arg) override;
     void onExit() override;
@@ -76,6 +85,8 @@ private:
     void deleteChar();
     void moveKeyboardCursor(int row_delta, int col_delta);
     char getCurrentKeyboardChar();
+    const char* const* getCurrentKeyboardLayout();
+    void switchKeyboardMode(KeyboardMode mode);
     
     void showTestResult(bool success, const char* message);
 };
