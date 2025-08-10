@@ -7,6 +7,10 @@
 #include "FluidNCModel.h"
 #include "NVS.h"
 #include "transport/transport.h"
+#ifdef USE_WIFI_PENDANT
+#include "transport/wifi_transport_factory.h"
+#include <WiFi.h>
+#endif
 
 #include <Esp.h>  // ESP.restart()
 
@@ -66,12 +70,22 @@ public:
 };
 
 // Global transport instance
+#ifdef USE_WIFI_PENDANT
+Transport* transport = nullptr; // Will be created dynamically for WiFi transports
+#else
 static SerialTransport serialTransport;
 Transport* transport = &serialTransport;
+#endif
 
 // Transport factory implementation
 Transport* TransportFactory::createTransport() {
+#ifdef USE_WIFI_PENDANT
+    // For WiFi builds, transport will be created based on configuration
+    // Default to WebSocket transport for now
+    return WiFiTransportFactory::createWSTransport("192.168.1.100", 81);
+#else
     return &serialTransport;
+#endif
 }
 
 // We use the ESP-IDF UART driver instead of the Arduino
@@ -183,15 +197,41 @@ void init_system() {
         return;
     }
 
-    // Initialize transport layer
+#ifdef USE_WIFI_PENDANT
+    // For WiFi pendant, transport will be created once WiFi connection is established
+    // This will be handled in the main loop after WiFi is connected
+#else
+    // Initialize transport layer for non-WiFi builds
     if (transport) {
         transport->begin();
     }
+#endif
 
     // Make an offscreen canvas that can be copied to the screen all at once
     canvas.setColorDepth(8);
     canvas.createSprite(240, 240);  // display.width(), display.height());
 }
+
+#ifdef USE_WIFI_PENDANT
+// Initialize WiFi transport once WiFi connection is established
+void init_wifi_transport() {
+    if (transport == nullptr && WiFi.isConnected()) {
+        // TODO: Get host and port from configuration
+        // For now, default to WebSocket transport
+        const char* host = "192.168.1.100"; // Should come from configuration
+        int port = 81; // Should come from configuration
+        
+        transport = WiFiTransportFactory::createWSTransport(host, port);
+        if (transport && transport->begin()) {
+            dbg_printf("WiFi transport initialized successfully\n");
+        } else {
+            dbg_printf("Failed to initialize WiFi transport\n");
+            delete transport;
+            transport = nullptr;
+        }
+    }
+}
+#endif
 void resetFlowControl() {
     if (transport) {
         transport->resetFlowControl();

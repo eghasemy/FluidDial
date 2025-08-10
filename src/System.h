@@ -46,6 +46,10 @@ void drawPngFile(LGFX_Sprite* sprite, const char* filename, int x, int y);
 
 void init_system();
 
+#ifdef USE_WIFI_PENDANT
+void init_wifi_transport();
+#endif
+
 void ackBeep();
 
 void dbg_write(uint8_t c);
