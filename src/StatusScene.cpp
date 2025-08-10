@@ -160,6 +160,11 @@ public:
         drawMenuTitle(current_scene->name());
         drawStatus();
 
+#ifdef USE_WIFI_PENDANT
+        // Draw connection status indicator in top right corner
+        drawConnectionStatus(220, 15);
+#endif
+
         DRO dro(16, 68, 210, 32);
         dro.draw(0, -1, true);
         dro.draw(1, -1, true);

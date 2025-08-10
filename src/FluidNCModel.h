@@ -62,5 +62,9 @@ void set_disconnected_state();
 
 void update_rx_time();
 
+#ifdef USE_WIFI_PENDANT
+void trigger_status_redraw();
+#endif
+
 extern pos_t toMm(pos_t position);
 extern pos_t fromMm(pos_t position);

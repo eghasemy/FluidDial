@@ -78,6 +78,7 @@ bool decode_state_string(const char* state_string, state_t& state) {
 void set_disconnected_state() {
     state           = Disconnected;
     my_state_string = "N/C";
+    current_scene->reDisplay(); // Trigger redisplay to update connection status indicator
 }
 
 // clang-format off
@@ -340,3 +341,11 @@ void update_rx_time() {
     next_ping_ms  = now + ping_interval_ms;
     disconnect_ms = now + disconnect_interval_ms;
 }
+
+#ifdef USE_WIFI_PENDANT
+void trigger_status_redraw() {
+    if (current_scene) {
+        current_scene->reDisplay();
+    }
+}
+#endif
