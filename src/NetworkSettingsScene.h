@@ -51,7 +51,7 @@ private:
     static const char* keyboard_layout_numbers[4][10];
 
 public:
-    NetworkSettingsScene() : Scene("Network Settings", 1), _current_field(0), _editing(false), 
+    NetworkSettingsScene() : Scene("Network Settings", 4), _current_field(0), _editing(false), 
                            _password_masked(true), _cursor_pos(0), _keyboard_active(false),
                            _keyboard_row(0), _keyboard_col(0), _keyboard_mode(KEYBOARD_LOWERCASE) {}
 

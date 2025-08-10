@@ -63,6 +63,9 @@ void NetworkSettingsScene::saveNetworkSettings() {
 
     if (success) {
         showTestResult(true, "Settings saved!");
+        // Reload settings to ensure UI reflects what was actually saved
+        loadNetworkSettings();
+        reDisplay();
         // Trigger reconnection if WiFi is currently active
         if (wifiReady()) {
             // Disconnect and attempt to reconnect with new settings
@@ -165,9 +168,14 @@ void NetworkSettingsScene::onTouchClick() {
 }
 
 void NetworkSettingsScene::onEncoder(int delta) {
+    // Ignore very small deltas to prevent micro-movements
+    if (abs(delta) < 1) {
+        return;
+    }
+    
     if (_keyboard_active) {
         // Navigate through keyboard keys in linear fashion (left-to-right, top-to-bottom)
-        // Normalize delta to prevent jumping multiple keys
+        // Absolute normalization to prevent jumping multiple keys
         int step = (delta > 0) ? 1 : -1;
         int current_pos = _keyboard_row * 10 + _keyboard_col;
         current_pos += step;
@@ -198,6 +206,7 @@ void NetworkSettingsScene::onEncoder(int delta) {
     } else if (_editing) {
         // Special handling for transport field - cycle through options
         if (_current_field == FIELD_TRANSPORT) {
+            // Absolute normalization for transport switching
             if (delta > 0) {
                 _edit_buffer = (_edit_buffer == "ws") ? "tcp" : "ws";
             } else {
@@ -208,7 +217,7 @@ void NetworkSettingsScene::onEncoder(int delta) {
             moveCursor(delta);
         }
     } else {
-        // Move between fields - normalize delta to prevent jumping multiple fields
+        // Move between fields - absolute normalization to prevent jumping multiple fields
         int step = (delta > 0) ? 1 : -1;
         _current_field += step;
         if (_current_field >= FIELD_COUNT)
