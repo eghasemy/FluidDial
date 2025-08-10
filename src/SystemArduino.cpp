@@ -9,6 +9,7 @@
 #include "transport/transport.h"
 #ifdef USE_WIFI_PENDANT
 #include "transport/wifi_transport_factory.h"
+#include "transport/transport_config.h"
 #include <WiFi.h>
 #endif
 
@@ -81,8 +82,13 @@ Transport* transport = &serialTransport;
 Transport* TransportFactory::createTransport() {
 #ifdef USE_WIFI_PENDANT
     // For WiFi builds, transport will be created based on configuration
-    // Default to WebSocket transport for now
-    return WiFiTransportFactory::createWSTransport("192.168.1.100", 81);
+    TransportConfig::TransportType type = TransportConfig::getTransportType();
+    const char* host = TransportConfig::getHost();
+    int port = TransportConfig::getPort();
+    
+    return WiFiTransportFactory::createTransport(
+        (type == TransportConfig::TELNET) ? WiFiTransportFactory::TELNET : WiFiTransportFactory::WEBSOCKET,
+        host, port);
 #else
     return &serialTransport;
 #endif
@@ -216,12 +222,8 @@ void init_system() {
 // Initialize WiFi transport once WiFi connection is established
 void init_wifi_transport() {
     if (transport == nullptr && WiFi.isConnected()) {
-        // TODO: Get host and port from configuration
-        // For now, default to WebSocket transport
-        const char* host = "192.168.1.100"; // Should come from configuration
-        int port = 81; // Should come from configuration
-        
-        transport = WiFiTransportFactory::createWSTransport(host, port);
+        // Use configuration to determine transport type and settings
+        transport = TransportFactory::createTransport();
         if (transport && transport->begin()) {
             dbg_printf("WiFi transport initialized successfully\n");
         } else {
