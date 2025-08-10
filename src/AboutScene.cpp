@@ -4,8 +4,10 @@
 #include "Scene.h"
 #include "FileParser.h"
 #include "AboutScene.h"
+#include "WifiSettingsScene.h"
 
 extern Scene menuScene;
+extern WifiSettingsScene wifiSettingsScene;
 
 extern const char* git_info;  // auto generated version.cpp
 
@@ -41,8 +43,8 @@ void AboutScene::onRedButtonPress() {
     dbg_println("Sleep");
 #    endif
 #else
-    next_layout(1);
-    reDisplay();
+    // For CYD, open WiFi settings instead of cycling layouts
+    push_scene(&wifiSettingsScene);
 #endif
 }
 
@@ -123,7 +125,7 @@ void AboutScene::reDisplay() {
 #ifdef USE_M5
     drawButtonLegends("Sleep", greenLegend, "Menu");
 #else
-    drawButtonLegends("Layout", greenLegend, "Menu");
+    drawButtonLegends("WiFi", greenLegend, "Menu");
 #endif
     drawError();  // if there is one
     refreshDisplay();
