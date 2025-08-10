@@ -1,0 +1,33 @@
+/*
+ * Example /net.json file structure
+ * 
+ * This shows what the network configuration file looks like
+ * when saved by the NetStore::netSave() function.
+ */
+
+// Example 1: Complete configuration
+{
+  "ssid": "MyWiFiNetwork",
+  "pass": "MySecretPassword",  
+  "host": "fluidnc.example.com",
+  "port": 8080,
+  "transport": "tcp"
+}
+
+// Example 2: Configuration with defaults
+{
+  "ssid": "HomeWiFi",
+  "pass": "HomePassword",
+  "host": "fluidnc.local",
+  "port": 81,
+  "transport": "ws"
+}
+
+// Example 3: Minimal configuration (empty WiFi credentials)
+{
+  "ssid": "",
+  "pass": "",
+  "host": "custom.host",
+  "port": 9090,
+  "transport": "ws"
+}
