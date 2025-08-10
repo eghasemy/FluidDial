@@ -56,6 +56,9 @@ void loop() {
 #ifdef USE_WIFI_PENDANT
     // Update WiFi connection status and handle reconnects
     wifiReady();
+    
+    // Initialize WiFi transport if not already done
+    init_wifi_transport();
 #endif
     
     if (transport) {

@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 // Transport layer abstraction for FluidNC communication
 // Supports both UART (current) and WiFi (future) communication methods
 

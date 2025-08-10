@@ -7,6 +7,11 @@
 #include "FluidNCModel.h"
 #include "NVS.h"
 #include "transport/transport.h"
+#ifdef USE_WIFI_PENDANT
+#include "transport/wifi_transport_factory.h"
+#include "transport/transport_config.h"
+#include <WiFi.h>
+#endif
 
 #include <Esp.h>  // ESP.restart()
 
@@ -66,12 +71,27 @@ public:
 };
 
 // Global transport instance
+#ifdef USE_WIFI_PENDANT
+Transport* transport = nullptr; // Will be created dynamically for WiFi transports
+#else
 static SerialTransport serialTransport;
 Transport* transport = &serialTransport;
+#endif
 
 // Transport factory implementation
 Transport* TransportFactory::createTransport() {
+#ifdef USE_WIFI_PENDANT
+    // For WiFi builds, transport will be created based on configuration
+    TransportConfig::TransportType type = TransportConfig::getTransportType();
+    const char* host = TransportConfig::getHost();
+    int port = TransportConfig::getPort();
+    
+    return WiFiTransportFactory::createTransport(
+        (type == TransportConfig::TELNET) ? WiFiTransportFactory::TELNET : WiFiTransportFactory::WEBSOCKET,
+        host, port);
+#else
     return &serialTransport;
+#endif
 }
 
 // We use the ESP-IDF UART driver instead of the Arduino
@@ -183,15 +203,37 @@ void init_system() {
         return;
     }
 
-    // Initialize transport layer
+#ifdef USE_WIFI_PENDANT
+    // For WiFi pendant, transport will be created once WiFi connection is established
+    // This will be handled in the main loop after WiFi is connected
+#else
+    // Initialize transport layer for non-WiFi builds
     if (transport) {
         transport->begin();
     }
+#endif
 
     // Make an offscreen canvas that can be copied to the screen all at once
     canvas.setColorDepth(8);
     canvas.createSprite(240, 240);  // display.width(), display.height());
 }
+
+#ifdef USE_WIFI_PENDANT
+// Initialize WiFi transport once WiFi connection is established
+void init_wifi_transport() {
+    if (transport == nullptr && WiFi.isConnected()) {
+        // Use configuration to determine transport type and settings
+        transport = TransportFactory::createTransport();
+        if (transport && transport->begin()) {
+            dbg_printf("WiFi transport initialized successfully\n");
+        } else {
+            dbg_printf("Failed to initialize WiFi transport\n");
+            delete transport;
+            transport = nullptr;
+        }
+    }
+}
+#endif
 void resetFlowControl() {
     if (transport) {
         transport->resetFlowControl();
