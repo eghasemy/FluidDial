@@ -17,6 +17,7 @@ public:
     
     static bool loadConfig();
     static bool saveConfig();
+    static void invalidateCache();
     static TransportType getTransportType();
     static void setTransportType(TransportType type);
     static const char* getHost();

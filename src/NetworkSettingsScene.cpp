@@ -9,6 +9,7 @@
 #    include "net/net_store.h"
 #    include "net/net_config.h"
 #    include "transport/transport_config.h"
+#    include "transport/transport.h"
 #    include "Text.h"
 #    include "Drawing.h"
 
@@ -72,6 +73,9 @@ void NetworkSettingsScene::saveNetworkSettings() {
         // Save transport config to persistent storage
         TransportConfig::saveConfig();
         
+        // Invalidate transport config cache so next load reads updated values
+        TransportConfig::invalidateCache();
+        
         showTestResult(true, "Settings saved!");
         // Reload settings to ensure UI reflects what was actually saved
         loadNetworkSettings();
@@ -85,7 +89,7 @@ void NetworkSettingsScene::saveNetworkSettings() {
             wifiConnectAsync();
             // Force transport re-selection after WiFi reconnects
             delay_ms(2000);  // Give WiFi time to reconnect
-            selectTransport(); // This will create new transport with updated config
+            forceTransportReconnect(); // Force recreation with updated config
         }
     } else {
         showTestResult(false, "Save failed!");

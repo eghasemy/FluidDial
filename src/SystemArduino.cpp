@@ -135,6 +135,17 @@ void selectTransport() {
         dbg_printf("Transport: Using Serial transport\n");
     }
 }
+
+void forceTransportReconnect() {
+    // Force disconnect current transport and recreate with updated config
+    if (transport && transport != &serialTransport) {
+        delete transport; // Clean up old transport
+    }
+    transport = &serialTransport; // Temporarily use serial fallback
+    
+    // Now call selectTransport which will create new transport with updated config
+    selectTransport();
+}
 #endif
 
 // We use the ESP-IDF UART driver instead of the Arduino
