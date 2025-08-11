@@ -105,17 +105,36 @@ Transport* TransportFactory::createTransport() {
 void selectTransport() {
     // If user has made an explicit transport choice, respect it and don't auto-switch
     if (userTransportChoiceActive) {
-        // If transport exists and matches user choice, try to maintain it
+        // If transport exists and matches user choice, maintain it strictly
         if (transport) {
             if (strcmp(userChosenTransportType, "Serial") == 0 && transport == &serialTransport) {
                 return; // User chose serial and we have serial - keep it
             } else if (strcmp(userChosenTransportType, "WiFi") == 0 && transport != &serialTransport) {
-                // User chose WiFi and we have WiFi transport - only switch if not connected and WiFi is ready
-                if (transport->isConnected() || !wifiReady()) {
-                    return; // Keep current WiFi transport if connected or if WiFi not ready
-                }
+                // User chose WiFi and we have WiFi transport - keep it regardless of connection status
+                // This prevents main loop from interfering with WebSocket connection process
+                return; // Keep current WiFi transport - let it establish connection naturally
             }
         }
+        
+        // Only recreate transport if user chose WiFi but we don't have one yet, and only if WiFi is ready
+        if (strcmp(userChosenTransportType, "WiFi") == 0 && !transport && wifiReady()) {
+            // User chose WiFi but no transport exists yet - create one
+            Transport* wifiTransport = TransportFactory::createTransport();
+            if (wifiTransport && wifiTransport->begin()) {
+                transport = wifiTransport;
+                dbg_printf("Transport: Created WiFi transport for user choice\n");
+                return;
+            } else {
+                // Failed to create WiFi transport, clean up
+                if (wifiTransport) {
+                    delete wifiTransport;
+                }
+                dbg_printf("Transport: Failed to create WiFi transport for user choice\n");
+            }
+        }
+        
+        // If we get here with user choice active, don't auto-switch - respect user choice
+        return;
     }
     
     // If transport is already initialized and working, don't change it
@@ -123,8 +142,8 @@ void selectTransport() {
         return;
     }
     
-    // Check if WiFi is ready and we should use WiFi transport (only if no user choice or user chose WiFi)
-    if (wifiReady() && (!userTransportChoiceActive || strcmp(userChosenTransportType, "WiFi") == 0)) {
+    // Check if WiFi is ready and we should use WiFi transport (automatic selection only)
+    if (wifiReady()) {
         // Try to create WiFi transport
         Transport* wifiTransport = TransportFactory::createTransport();
         if (wifiTransport && wifiTransport->begin()) {
@@ -144,16 +163,14 @@ void selectTransport() {
         }
     }
     
-    // Fall back to Serial transport (only if no user choice or user chose serial or WiFi failed)
-    if (!userTransportChoiceActive || strcmp(userChosenTransportType, "Serial") == 0 || !wifiReady()) {
-        if (transport != &serialTransport) {
-            if (transport) {
-                delete transport; // Clean up old transport
-            }
-            transport = &serialTransport;
-            transport->begin();
-            dbg_printf("Transport: Using Serial transport\n");
+    // Fall back to Serial transport (automatic selection only)
+    if (transport != &serialTransport) {
+        if (transport) {
+            delete transport; // Clean up old transport
         }
+        transport = &serialTransport;
+        transport->begin();
+        dbg_printf("Transport: Using Serial transport\n");
     }
 }
 
