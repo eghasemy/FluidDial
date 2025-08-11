@@ -117,8 +117,8 @@ bool NetworkSettingsScene::testNetworkConnection() {
     // Wait for WiFi to establish connection
     delay_ms(2000);
     
-    // Test actual FluidNC connection 
-    bool host_success = NetConfig::testFluidNCConnection(_host, _port);
+    // Test actual FluidNC connection using the same transport as runtime
+    bool host_success = NetConfig::testFluidNCConnectionWithTransport(_host, _port, _transport);
     if (!host_success) {
         showTestResult(false, "FluidNC failed");
         return false;
