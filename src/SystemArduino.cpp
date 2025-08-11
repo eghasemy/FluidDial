@@ -178,6 +178,7 @@ void forceTransportReconnectByType(const char* connection_type) {
         transport = &serialTransport;
         transport->begin();
         dbg_printf("Transport: Forced to Serial transport by user selection\n");
+        reset_fluidnc_connection(); // Reset FluidNC connection state for fresh start
         return;
     }
     
@@ -188,6 +189,7 @@ void forceTransportReconnectByType(const char* connection_type) {
             // Fallback to serial for now, but user will see connection error
             transport = &serialTransport;
             transport->begin();
+            reset_fluidnc_connection(); // Reset FluidNC connection state for fresh start
             return;
         }
         
@@ -196,6 +198,7 @@ void forceTransportReconnectByType(const char* connection_type) {
         if (wifiTransport && wifiTransport->begin()) {
             transport = wifiTransport;
             dbg_printf("Transport: Forced to WiFi transport by user selection\n");
+            reset_fluidnc_connection(); // Reset FluidNC connection state for fresh start
             return;
         } else {
             // Failed to create WiFi transport, clean up
@@ -206,6 +209,7 @@ void forceTransportReconnectByType(const char* connection_type) {
             // Don't fallback to serial when user explicitly chose WiFi
             transport = &serialTransport;
             transport->begin();
+            reset_fluidnc_connection(); // Reset FluidNC connection state for fresh start
         }
     }
 }
