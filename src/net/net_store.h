@@ -23,6 +23,13 @@ public:
     static bool netSave(const char* ssid, const char* password, const char* host, int port, const char* transport);
     static bool netLoad(char* ssid, size_t ssidLen, char* password, size_t passwordLen, 
                        char* host, size_t hostLen, int& port, char* transport, size_t transportLen);
+    
+    // Extended functions with connection type
+    static bool netSaveWithConnectionType(const char* ssid, const char* password, const char* host, int port, 
+                                         const char* transport, const char* connection_type);
+    static bool netLoadWithConnectionType(char* ssid, size_t ssidLen, char* password, size_t passwordLen, 
+                                         char* host, size_t hostLen, int& port, char* transport, size_t transportLen,
+                                         char* connection_type, size_t connectionTypeLen);
 };
 
 #endif // USE_WIFI_PENDANT

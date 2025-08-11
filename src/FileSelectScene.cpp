@@ -296,7 +296,9 @@ public:
     }
 
     void scroll(int updown) {
-        int nextSelect = _selected_file + updown;
+        // Normalize delta to prevent jumping multiple files
+        int step = (updown > 0) ? 1 : -1;
+        int nextSelect = _selected_file + step;
 #ifdef WRAP_FILE_LIST
         if (fileVector.size() < 3) {
             if (nextSelect < 0 || nextSelect > (int)(fileVector.size() - 1)) {

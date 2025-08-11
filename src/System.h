@@ -49,6 +49,8 @@ void init_system();
 #ifdef USE_WIFI_PENDANT
 void init_wifi_transport();
 void selectTransport();
+void forceTransportReconnect();
+void forceTransportReconnectByType(const char* connection_type);
 #endif
 
 void ackBeep();

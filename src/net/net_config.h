@@ -23,6 +23,7 @@ public:
     static void disconnectWifi();
     static bool discoverFluidNCHost(char* host, size_t hostLen, int& port);
     static bool testFluidNCConnection(const char* host, int port);
+    static bool testFluidNCConnectionWithTransport(const char* host, int port, const char* transport_type);
     static const char* getWifiStatus();
     static const char* getLocalIP();
 };

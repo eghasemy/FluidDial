@@ -172,7 +172,11 @@ public:
     virtual int  touchedItem(int x, int y) { return -1; }
     virtual void rotate(int delta);
 
-    void onEncoder(int delta) override { rotate(delta); }
+    void onEncoder(int delta) override { 
+        // Normalize delta to prevent jumping multiple menu items
+        int step = (delta > 0) ? 1 : -1;
+        rotate(step); 
+    }
 
     void setPosition(int item_num, Point position) { _positions[item_num] = position; }
     void setItem(int item_num, Item* item) { _items[item_num] = item; }

@@ -75,6 +75,10 @@ public:
 #ifdef USE_WIFI_PENDANT
 static SerialTransport serialTransport; // Fallback for WiFi builds
 Transport* transport = nullptr; // Will be created dynamically for WiFi transports
+
+// Flag to track if user has made an explicit transport choice
+static bool userTransportChoiceActive = false;
+static const char* userChosenTransportType = nullptr;
 #else
 static SerialTransport serialTransport;
 Transport* transport = &serialTransport;
@@ -99,12 +103,46 @@ Transport* TransportFactory::createTransport() {
 #ifdef USE_WIFI_PENDANT
 // Select transport based on WiFi availability and settings
 void selectTransport() {
+    // If user has made an explicit transport choice, respect it and don't auto-switch
+    if (userTransportChoiceActive) {
+        // If transport exists and matches user choice, maintain it strictly
+        if (transport) {
+            if (strcmp(userChosenTransportType, "Serial") == 0 && transport == &serialTransport) {
+                return; // User chose serial and we have serial - keep it
+            } else if (strcmp(userChosenTransportType, "WiFi") == 0 && transport != &serialTransport) {
+                // User chose WiFi and we have WiFi transport - keep it regardless of connection status
+                // This prevents main loop from interfering with WebSocket connection process
+                return; // Keep current WiFi transport - let it establish connection naturally
+            }
+        }
+        
+        // Only recreate transport if user chose WiFi but we don't have one yet, and only if WiFi is ready
+        if (strcmp(userChosenTransportType, "WiFi") == 0 && !transport && wifiReady()) {
+            // User chose WiFi but no transport exists yet - create one
+            Transport* wifiTransport = TransportFactory::createTransport();
+            if (wifiTransport && wifiTransport->begin()) {
+                transport = wifiTransport;
+                dbg_printf("Transport: Created WiFi transport for user choice\n");
+                return;
+            } else {
+                // Failed to create WiFi transport, clean up
+                if (wifiTransport) {
+                    delete wifiTransport;
+                }
+                dbg_printf("Transport: Failed to create WiFi transport for user choice\n");
+            }
+        }
+        
+        // If we get here with user choice active, don't auto-switch - respect user choice
+        return;
+    }
+    
     // If transport is already initialized and working, don't change it
     if (transport && transport->isConnected()) {
         return;
     }
     
-    // Check if WiFi is ready and we should use WiFi transport
+    // Check if WiFi is ready and we should use WiFi transport (automatic selection only)
     if (wifiReady()) {
         // Try to create WiFi transport
         Transport* wifiTransport = TransportFactory::createTransport();
@@ -125,7 +163,7 @@ void selectTransport() {
         }
     }
     
-    // Fall back to Serial transport
+    // Fall back to Serial transport (automatic selection only)
     if (transport != &serialTransport) {
         if (transport) {
             delete transport; // Clean up old transport
@@ -133,6 +171,115 @@ void selectTransport() {
         transport = &serialTransport;
         transport->begin();
         dbg_printf("Transport: Using Serial transport\n");
+    }
+}
+
+void forceTransportReconnect() {
+    // Force disconnect current transport and recreate with updated config
+    if (transport && transport != &serialTransport) {
+        delete transport; // Clean up old transport
+    }
+    transport = nullptr; // Don't use serial fallback to avoid early return in selectTransport
+    
+    // Force transport selection even without WiFi ready check
+    if (wifiReady()) {
+        // Try to create WiFi transport with updated config
+        Transport* wifiTransport = TransportFactory::createTransport();
+        if (wifiTransport && wifiTransport->begin()) {
+            transport = wifiTransport;
+            dbg_printf("Transport: Forced WiFi transport reconnection successful\n");
+            return;
+        } else {
+            // Failed to create WiFi transport, clean up
+            if (wifiTransport) {
+                delete wifiTransport;
+            }
+            dbg_printf("Transport: Failed to force WiFi transport reconnection\n");
+        }
+    }
+    
+    // Fallback to serial transport if WiFi transport fails
+    transport = &serialTransport;
+    transport->begin();
+    dbg_printf("Transport: Falling back to Serial transport\n");
+}
+
+void forceTransportReconnectByType(const char* connection_type) {
+    // Force disconnect current transport and recreate based on user selection
+    if (transport && transport != &serialTransport) {
+        delete transport; // Clean up old transport
+    }
+    transport = nullptr;
+    
+    // Set user choice flags
+    userTransportChoiceActive = true;
+    userChosenTransportType = connection_type; // Store pointer to string (should be static)
+    
+    if (strcmp(connection_type, "Serial") == 0) {
+        // User selected Serial - use serial transport regardless of WiFi status
+        transport = &serialTransport;
+        transport->begin();
+        dbg_printf("Transport: Forced to Serial transport by user selection\n");
+        reset_fluidnc_connection(); // Reset FluidNC connection state for fresh start
+        return;
+    }
+    
+    // User selected WiFi - only use WiFi transport
+    if (strcmp(connection_type, "WiFi") == 0) {
+        if (!wifiReady()) {
+            dbg_printf("Transport: WiFi selected but not ready\n");
+            // Fallback to serial for now, but user will see connection error
+            transport = &serialTransport;
+            transport->begin();
+            reset_fluidnc_connection(); // Reset FluidNC connection state for fresh start
+            return;
+        }
+        
+        // Try to create WiFi transport with updated config
+        Transport* wifiTransport = TransportFactory::createTransport();
+        if (wifiTransport && wifiTransport->begin()) {
+            transport = wifiTransport;
+            dbg_printf("Transport: Forced to WiFi transport by user selection\n");
+            
+            // Give WebSocket time to connect before declaring success
+            // WebSocket connection is asynchronous, so we need to wait for it
+            dbg_printf("Transport: Waiting for WebSocket connection to establish...\n");
+            int maxWaitMs = 10000; // Wait up to 10 seconds (increased from 5)
+            int waitedMs = 0;
+            const int checkIntervalMs = 100;
+            
+            while (waitedMs < maxWaitMs && !transport->isConnected()) {
+                transport->loop(); // Process WebSocket events
+                delay_ms(checkIntervalMs);
+                waitedMs += checkIntervalMs;
+                
+                // Every second, print a progress message
+                if (waitedMs % 1000 == 0) {
+                    dbg_printf("Transport: Still waiting for connection... %d/%d seconds\n", waitedMs/1000, maxWaitMs/1000);
+                }
+            }
+            
+            if (transport->isConnected()) {
+                dbg_printf("Transport: WiFi transport connected successfully after %d ms\n", waitedMs);
+            } else {
+                dbg_printf("Transport: WiFi transport failed to connect within %d ms timeout\n", maxWaitMs);
+                // Don't fall back to serial - let the user see the connection issue
+                // The pending connection might still succeed later
+            }
+            
+            reset_fluidnc_connection(); // Reset FluidNC connection state for fresh start
+            return;
+        } else {
+            // Failed to create WiFi transport, clean up
+            if (wifiTransport) {
+                delete wifiTransport;
+            }
+            dbg_printf("Transport: Failed to create WiFi transport, user selected WiFi but connection failed\n");
+            // Don't fallback to serial when user explicitly chose WiFi
+            transport = &serialTransport;
+            transport->begin();
+            reset_fluidnc_connection(); // Reset FluidNC connection state for fresh start
+        }
     }
 }
 #endif

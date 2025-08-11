@@ -90,6 +90,11 @@ bool TransportConfig::saveConfig() {
     return true;
 }
 
+void TransportConfig::invalidateCache() {
+    _configLoaded = false;
+    dbg_printf("TransportConfig: Cache invalidated, will reload on next access\n");
+}
+
 TransportConfig::TransportType TransportConfig::getTransportType() {
     loadConfig();
     return _transportType;

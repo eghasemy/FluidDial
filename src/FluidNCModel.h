@@ -59,6 +59,7 @@ const char* mode_string();
 
 bool fnc_is_connected();
 void set_disconnected_state();
+void reset_fluidnc_connection();
 
 void update_rx_time();
 

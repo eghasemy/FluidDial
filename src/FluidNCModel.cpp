@@ -317,6 +317,11 @@ void request_status_report() {
 }
 
 bool fnc_is_connected() {
+    // First check if transport layer is connected
+    if (!transport || !transport->isConnected()) {
+        return false;
+    }
+    
     int now = milliseconds();
     if (starting) {
         starting      = false;
@@ -340,6 +345,12 @@ void update_rx_time() {
     int now       = milliseconds();
     next_ping_ms  = now + ping_interval_ms;
     disconnect_ms = now + disconnect_interval_ms;
+}
+
+void reset_fluidnc_connection() {
+    starting = true;  // Reset to starting state to trigger fresh connection attempt
+    state = Disconnected;
+    my_state_string = "N/C";
 }
 
 #ifdef USE_WIFI_PENDANT

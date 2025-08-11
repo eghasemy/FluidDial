@@ -52,8 +52,10 @@ public:
         if (updown == 0) {
             return;
         }
+        // Normalize delta to prevent jumping multiple lines
+        int step = (updown > 0) ? 1 : -1;
         int fl = _firstline;
-        fl += updown;
+        fl += step;
         if (fl >= 0) {
             _firstline = fl;
             get_lines();

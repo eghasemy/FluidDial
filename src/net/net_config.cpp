@@ -8,7 +8,9 @@
 #include "System.h"
 #include "net_store.h"
 #include <WiFi.h>
+#include <WiFiClient.h>
 #include <LittleFS.h>
+#include <WebSocketsClient.h>
 
 // WiFi connection state management
 static wl_status_t lastWifiStatus = WL_IDLE_STATUS;
@@ -181,11 +183,93 @@ bool NetConfig::discoverFluidNCHost(char* host, size_t hostLen, int& port) {
 }
 
 bool NetConfig::testFluidNCConnection(const char* host, int port) {
-    // Stub implementation for now
-    // Future: Test TCP connection to FluidNC host
-    (void)host;
-    (void)port;
-    return isWifiConnected(); // Simple check for now
+    if (!isWifiConnected()) {
+        return false;
+    }
+    
+    // Test actual TCP connection to FluidNC host
+    WiFiClient client;
+    client.setTimeout(5000); // 5 second timeout
+    
+    dbg_printf("Testing FluidNC connection to %s:%d\n", host, port);
+    
+    bool connected = client.connect(host, port);
+    if (connected) {
+        dbg_printf("FluidNC connection test successful\n");
+        client.stop();
+        return true;
+    } else {
+        dbg_printf("FluidNC connection test failed\n");
+        return false;
+    }
+}
+
+bool NetConfig::testFluidNCConnectionWithTransport(const char* host, int port, const char* transport_type) {
+    if (!isWifiConnected()) {
+        dbg_printf("Transport test: WiFi not connected\n");
+        return false;
+    }
+    
+    if (!transport_type) {
+        dbg_printf("Transport test: No transport type specified\n");
+        return false;
+    }
+    
+    dbg_printf("Testing FluidNC connection to %s:%d using %s transport\n", host, port, transport_type);
+    
+    if (strcmp(transport_type, "tcp") == 0) {
+        // For TCP/Telnet, use the existing TCP test
+        return testFluidNCConnection(host, port);
+    } else if (strcmp(transport_type, "ws") == 0) {
+        // For WebSocket, test the actual WebSocket connection
+        WebSocketsClient wsClient;
+        bool connected = false;
+        bool connectionFailed = false;
+        
+        // Set up event handler to track connection status
+        wsClient.onEvent([&](WStype_t type, uint8_t* payload, size_t length) {
+            switch (type) {
+                case WStype_CONNECTED:
+                    dbg_printf("Transport test: WebSocket connected to %s\n", payload);
+                    connected = true;
+                    break;
+                case WStype_DISCONNECTED:
+                    dbg_printf("Transport test: WebSocket disconnected\n");
+                    break;
+                case WStype_ERROR:
+                    dbg_printf("Transport test: WebSocket error\n");
+                    connectionFailed = true;
+                    break;
+                default:
+                    break;
+            }
+        });
+        
+        // Attempt WebSocket connection
+        wsClient.begin(host, port, "/");
+        
+        // Wait up to 10 seconds for connection
+        unsigned long startTime = millis();
+        const unsigned long timeout = 10000; // 10 seconds
+        
+        while (!connected && !connectionFailed && (millis() - startTime < timeout)) {
+            wsClient.loop();
+            delay(100); // Small delay to prevent busy waiting
+        }
+        
+        wsClient.disconnect();
+        
+        if (connected) {
+            dbg_printf("Transport test: WebSocket connection successful\n");
+            return true;
+        } else {
+            dbg_printf("Transport test: WebSocket connection failed (timeout or error)\n");
+            return false;
+        }
+    } else {
+        dbg_printf("Transport test: Unknown transport type: %s\n", transport_type);
+        return false;
+    }
 }
 
 const char* NetConfig::getWifiStatus() {
